@@ -719,8 +719,8 @@
             <span id="sync-status" class="sync-badge">☁ Ready</span>
             
             <!-- Navigation View Switches -->
-            <button id="nav-habits-btn" class="btn btn-primary" onclick="switchTab('habits')">📋 Звички</button>
-            <button id="nav-budget-btn" class="btn" onclick="switchTab('budget')">💰 Бюджет</button>
+            <button id="nav-habits-btn" class="btn btn-primary" onclick="switchTab('habits')">Habits</button>
+            <button id="nav-budget-btn" class="btn" onclick="switchTab('budget')">Budget</button>
 
             <!-- Date Selectors -->
             <select id="year-select" onchange="changeCalendarMonth()"></select>
@@ -837,10 +837,10 @@
     <div id="budget-tab-view" class="view-section" style="display: none;">
         <div class="top-widgets">
             <div class="card">
-                <div class="widget-title">Загальний бюджет</div>
+                <div class="widget-title">Total budget</div>
                 <div class="donut-container">
                     <div class="donut-stats">
-                        <span class="stat-label">ЗАЛИШОК</span>
+                        <span class="stat-label">Remainder</span>
                         <span class="stat-val" id="b-total-balance">0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
@@ -851,10 +851,10 @@
             </div>
 
             <div class="card">
-                <div class="widget-title">Прибуток</div>
+                <div class="widget-title">Profit</div>
                 <div class="donut-container">
                     <div class="donut-stats">
-                        <span class="stat-label">ОТРИМАНО</span>
+                        <span class="stat-label">Received</span>
                         <span class="stat-val" id="b-total-income" style="color: var(--accent-green);">+0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
@@ -865,10 +865,10 @@
             </div>
 
             <div class="card">
-                <div class="widget-title">Убиток</div>
+                <div class="widget-title">Loss</div>
                 <div class="donut-container">
                     <div class="donut-stats">
-                        <span class="stat-label">ВИТРАЧЕНО</span>
+                        <span class="stat-label">Spent</span>
                         <span class="stat-val" id="b-total-expense" style="color: var(--accent-red);">-0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
@@ -879,10 +879,10 @@
             </div>
 
             <div class="card">
-                <div class="widget-title">Відклав</div>
+                <div class="widget-title">Savings</div>
                 <div class="donut-container">
                     <div class="donut-stats">
-                        <span class="stat-label">ЗАОЩАДЖЕНО</span>
+                        <span class="stat-label">Saved</span>
                         <span class="stat-val" id="b-total-saved" style="color: var(--accent-purple);">0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
@@ -895,17 +895,17 @@
 
         <div class="card table-card">
             <div class="table-header">
-                <div class="widget-title" style="margin: 0;">Реєстр операцій</div>
+                <div class="widget-title" style="margin: 0;">Transaction Register</div>
                 <span id="b-records-count" style="font-size: 0.75rem; color: var(--text-secondary);">Всього записів: 0</span>
             </div>
             <table class="budget-table">
                 <thead>
                     <tr>
-                        <th>Дата</th>
-                        <th>Опис / Джерело</th>
-                        <th>Категорія</th>
-                        <th>Тип</th>
-                        <th style="text-align: right;">Сума</th>
+                        <th>Date</th>
+                        <th>Description / Source</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th style="text-align: right;">Sum</th>
                     </tr>
                 </thead>
                 <tbody id="budget-tbody"></tbody>
@@ -914,7 +914,7 @@
 
         <div class="bottom-widgets">
             <div class="card">
-                <div class="widget-title">Аналітика за категоріями (Кільцевий розподіл)</div>
+                <div class="widget-title">Category Analytics (Donut Chart)</div>
                 <div style="display: flex; align-items: center; gap: 24px; padding-top: 8px;">
                     <svg class="donut" viewBox="0 0 36 36" style="width: 100px; height: 100px;">
                         <circle class="bg" cx="18" cy="18" r="15.9155" />
@@ -927,7 +927,7 @@
                             <span>🟥 Продукти та побут</span> <b>50%</b>
                         </div>
                         <div style="font-size: 0.8rem; display: flex; justify-content: space-between;">
-                            <span>🟣 Спільний фонд / Накопичення</span> <b>25%</b>
+                            <span>🟣 Накопичення</span> <b>25%</b>
                         </div>
                         <div style="font-size: 0.8rem; display: flex; justify-content: space-between;">
                             <span>🟦 Відпочинок та інші витрати</span> <b>25%</b>
@@ -937,14 +937,14 @@
             </div>
 
             <div class="card">
-                <div class="widget-title">Швидкі підсумки</div>
+                <div class="widget-title">Quick Summary</div>
                 <div class="category-list">
                     <div class="cat-row">
-                        <span>Місячний Дохід</span>
+                        <span>Monthly Income</span>
                         <span id="b-summary-income" style="color: var(--accent-green);">+0 ₴</span>
                     </div>
                     <div class="cat-row">
-                        <span>Всього витрачено</span>
+                        <span>Total spent</span>
                         <span id="b-summary-expense" style="color: var(--accent-red);">-0 ₴</span>
                     </div>
                 </div>
