@@ -957,19 +957,20 @@
 </div>
 
 <script>
+    // Оновлений список практичних і збалансованих щоденних звичок
     const defaultHabits = [
-        "Wake up at 06:00 ⏰",
-        "Meditation 🧘",
-        "GYM 💪",
-        "Cold Shower 🚿",
-        "Work 💼",
-        "Read 10 pages 📖",
-        "Learn a skill 🎓",
-        "No alcohol 🍷",
-        "No sugar 🍬",
-        "No social media 📱",
-        "Planning 📝",
-        "Sleep before 23:00 🌙"
+        "Ранній підйом (до 07:00) ⏰",
+        "Склянка води зранку 💧",
+        "Зарядка / Загартування 🏋️‍♂️",
+        "Планування дня 📝",
+        "Фокусна робота (без соцмереж) 💼",
+        "Читання книг 15-20 хв 📖",
+        "Розвиток навичок / Навчання 🎓",
+        "Прогулянка 30+ хв 🚶‍♂️",
+        "Контроль витрат за день 💰",
+        "Без цукру та фастфуду 🥗",
+        "Вечірня рефлексія 📔",
+        "Сон до 23:00 🌙"
     ];
 
     const defaultTransactions = [
@@ -1349,12 +1350,12 @@
                     isRemoteUpdate = true;
                     try {
                         state = {
-    ...state,
-    ...remoteData,
-    budget: remoteData.budget 
-        ? (Array.isArray(remoteData.budget) ? remoteData.budget : Object.values(remoteData.budget)) 
-        : []
-};
+                            ...state,
+                            ...remoteData,
+                            budget: remoteData.budget 
+                                ? (Array.isArray(remoteData.budget) ? remoteData.budget : Object.values(remoteData.budget)) 
+                                : []
+                        };
                         normalizeState();
                         saveLocalData();
 
