@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker & Focus Dashboard</title>
+    <!-- Google Fonts & Chart.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK (Modular App & Realtime Database) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Firebase Realtime Database used as the shared cloud state.
+        // The database URL can be changed here if you create your own Firebase project.
+        const firebaseConfig = {
+            databaseURL: "https://my-habit-tracker-1eaf1-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.db = db;
+        window.dbRef = ref;
+        window.dbOnValue = onValue;
+        window.dbSet = set;
+    </script>
+
+    <style>
+        :root {
+            --bg-main: #121212;
+            --card-bg: #1e1e1e;
+            --card-border: #2d2d2d;
+            --text-dark: #f0f0f0;
+            --text-muted: #888888;
+            --accent-black: #080808;
+            --row-alt: #161616;
+            --table-header-bg: #222222;
+            --weekend-bg: #242424;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1480px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Top Bar Controls */
+        .top-navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--accent-black);
+            color: #ffffff;
+            padding: 14px 20px;
+            border-radius: 6px;
+            border: 1px solid #2a2a2a;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .top-navbar h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .controls-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #444444;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .btn-primary {
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: #cccccc;
+        }
+
+        select, input[type="number"], input[type="text"] {
+            background: #2a2a2a;
+            border: 1px solid #444444;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #ffffff;
+            font-weight: 500;
+            outline: none;
+        }
+
+        /* Analytics Spoiler for Mobile */
+        .analytics-toggle-btn {
+            display: none;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        /* Top Analytics & Timer Section Grid */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 2.2fr 1.3fr 1.2fr 1fr;
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 12px;
+            text-align: center;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 6px;
+        }
+
+        .chart-box {
+            position: relative;
+            flex-grow: 1;
+            min-height: 140px;
+        }
+
+        /* Focus Timer Card Styling */
+        .timer-card {
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .timer-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 2px;
+            margin: 4px 0;
+        }
+
+        .timer-select {
+            width: 100%;
+            font-size: 11px;
+            margin-bottom: 6px;
+            background: #141414;
+        }
+
+        .timer-settings-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+            margin-bottom: 6px;
+        }
+
+        .timer-settings-row select {
+            flex: 1.2;
+            background: #141414;
+            font-size: 11px;
+        }
+
+        .timer-settings-row input {
+            flex: 1;
+            background: #141414;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .timer-controls .btn {
+            flex: 1;
+            padding: 5px 0;
+            font-size: 11px;
+        }
+
+        .overall-stats-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .stats-numbers {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            text-align: center;
+            color: var(--text-dark);
+        }
+
+        th, td {
+            border: 1px solid var(--card-border);
+            padding: 5px 2px;
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--table-header-bg);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .habit-title-col {
+            text-align: left;
+            padding-left: 10px;
+            font-weight: 600;
+            width: 180px;
+            min-width: 180px;
+            background: var(--card-bg);
+            position: sticky;
+            left: 0;
+            z-index: 2;
+        }
+
+        .day-header {
+            width: 24px;
+            min-width: 24px;
+        }
+
+        .is-weekend {
+            background-color: var(--weekend-bg);
+        }
+
+        .week-header {
+            background: #000000;
+            color: #ffffff;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .sub-header {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        tr:nth-child(even) {
+            background-color: var(--row-alt);
+        }
+
+        /* Checkbox Custom Styling */
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border: 1px solid #ffffff;
+            border-radius: 3px;
+            background-color: transparent;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            transition: all 0.15s ease-in-out;
+            margin: 0;
+        }
+
+        input[type="checkbox"]:checked {
+            background-color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        input[type="checkbox"]:checked::after {
+            content: '✓';
+            font-size: 10px;
+            font-weight: 900;
+            color: #121212;
+            line-height: 1;
+        }
+
+        .progress-bar-outer {
+            width: 50px;
+            height: 7px;
+            background: #333333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .progress-bar-inner {
+            height: 100%;
+            background: #ffffff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Mobile Today's Focus View */
+        .mobile-today-card {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .mobile-today-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mobile-today-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--row-alt);
+            border-radius: 6px;
+            border: 1px solid var(--card-border);
+        }
+
+        .mobile-today-item input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* Bottom Grid: Mental State & Top Habits */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 3.2fr 1fr;
+            gap: 15px;
+        }
+
+        .mental-state-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mental-inputs-table {
+            width: 100%;
+            margin-bottom: 5px;
+            border-collapse: collapse;
+        }
+
+        .mental-inputs-table td {
+            padding: 3px 0;
+            width: 24px;
+            min-width: 24px;
+        }
+
+        .mental-inputs-table input {
+            width: 100%;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-size: 11px;
+            font-weight: 600;
+            color: #ffffff;
+            padding: 2px 0;
+            outline: none;
+        }
+
+        .top-habits-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 11px;
+        }
+
+        .top-habit-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 10px;
+            background: var(--row-alt);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+        }
+
+        .delete-btn {
+            color: #666;
+            cursor: pointer;
+            margin-left: 6px;
+            font-weight: bold;
+        }
+
+        /* Media Queries for Mobile Responsiveness */
+        @media (max-width: 900px) {
+            body { padding: 10px; }
+            .dashboard-container { padding: 12px; }
+            .analytics-grid { display: flex; flex-direction: column; }
+            .bottom-grid { display: flex; flex-direction: column; }
+            .analytics-toggle-btn { display: block; }
+            .analytics-collapsible { display: none; }
+            .analytics-collapsible.show { display: flex; flex-direction: column; gap: 15px; }
+            .mobile-today-card { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <!-- Top Bar Navigation -->
+    <div class="top-navbar">
+        <div>
+            <h1>HABIT TRACKER</h1>
+            <span id="current-month-display" style="font-size: 11px; opacity: 0.7; font-weight: 500;">- DYNAMIC MONTH -</span>
+        </div>
+        <div class="controls-group">
+            <select id="year-select" onchange="changeCalendarMonth()"></select>
+            <select id="month-select" onchange="changeCalendarMonth()"></select>
+            <button class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
+            <button class="btn" onclick="syncPrompt()">⚡ Sync ID</button>
+            <span id="sync-status" style="font-size:11px;opacity:.7;">☁ Syncing...</span>
+            <button class="btn" onclick="resetMonthData()">Reset</button>
+        </div>
+    </div>
+
+    <!-- Toggle Analytics Button for Mobile -->
+    <button class="btn analytics-toggle-btn" onclick="toggleAnalytics()">📊 Show / Hide Analytics</button>
+
+    <!-- Top Analytics & Timer Grid -->
+    <div class="analytics-grid analytics-collapsible" id="analytics-section">
+        <!-- Daily Progress -->
+        <div class="card">
+            <div class="card-header">Daily Progress</div>
+            <div class="chart-box">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Focus Timer Card -->
+        <div class="card timer-card">
+            <div class="card-header" style="width: 100%;">Focus Timer</div>
+            <select id="timer-habit-select" class="timer-select"></select>
+            
+            <div class="timer-settings-row">
+                <select id="timer-preset-select" onchange="setPresetTime(this.value)">
+                    <option value="15">15 min</option>
+                    <option value="25" selected>25 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">60 min</option>
+                </select>
+                <input type="number" id="timer-custom-input" value="25" min="1" max="180" onchange="setCustomTime(this.value)">
+            </div>
+
+            <div class="timer-display" id="timer-display">25:00</div>
+            <div class="timer-controls">
+                <button class="btn btn-primary" id="timer-start-btn" onclick="toggleTimer()">Start</button>
+                <button class="btn" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Weekly Progress -->
+        <div class="card">
+            <div class="card-header">Weekly Progress</div>
+            <div class="chart-box">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Overall Stats -->
+        <div class="card">
+            <div class="card-header">Overall Stats</div>
+            <div class="overall-stats-content">
+                <div class="stats-numbers">
+                    <div class="stat-item">
+                        <span class="stat-label">Goal</span>
+                        <span class="stat-value" id="stat-goal">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Achieved</span>
+                        <span class="stat-value" id="stat-completed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Left</span>
+                        <span class="stat-value" id="stat-left">0</span>
+                    </div>
+                </div>
+                <div style="width: 80px; height: 80px;">
+                    <canvas id="overallChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile View: Today's Focus List -->
+    <div class="mobile-today-card">
+        <div class="card-header" style="text-align: left; margin-bottom: 10px;">Today's Habits (Day <span id="today-day-num">1</span>)</div>
+        <ul class="mobile-today-list" id="mobile-today-list">
+            <!-- Populated dynamically -->
+        </ul>
+    </div>
+
+    <!-- Main Table Section -->
+    <div class="table-container">
+        <table id="habits-table">
+            <thead>
+                <tr id="weeks-header-row">
+                    <th rowspan="2" class="habit-title-col">My Habits</th>
+                    <!-- Dynamic Week Headers -->
+                </tr>
+                <tr id="days-header-row">
+                    <!-- Dynamic Days Headers -->
+                </tr>
+            </thead>
+            <tbody id="habits-tbody">
+                <!-- JS generates habit rows -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Bottom Section: Mental State & Leaderboard -->
+    <div class="bottom-grid">
+        <div class="card mental-state-card">
+            <div class="card-header" style="text-align: left;">Mental State (Mood & Motivation)</div>
+            <div style="overflow-x: auto;">
+                <table class="mental-inputs-table">
+                    <tr id="mood-row">
+                        <td style="font-weight: 600; text-align: left; padding-left: 5px; width: 180px; min-width: 180px; color: #aaa;">Mood</td>
+                    </tr>
+                    <tr id="motivation-row">
+                        <td style="font-weight: 600; text-align: left; padding-left: 5px; width: 180px; min-width: 180px; color: #aaa;">Motivation</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="chart-box" style="height: 120px;">
+                <canvas id="mentalChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Top Daily Habits</div>
+            <ol class="top-habits-list" id="top-habits-list"></ol>
+        </div>
+    </div>
+</div>
+
+<script>
+    const defaultHabits = [
+        "Wake up at 06:00 ⏰",
+        "Meditation 🧘",
+        "GYM 💪",
+        "Cold Shower 🚿",
+        "Work 💼",
+        "Read 10 pages 📖",
+        "Learn a skill 🎓",
+        "No alcohol 🍷",
+        "No sugar 🍬",
+        "No social media 📱",
+        "Planning 📝",
+        "Sleep before 23:00 🌙"
+    ];
+
+    const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    let currentYear = 2026;
+    let currentMonth = 0; // January
+    let daysTotal = 31;
+
+    // The same Sync ID on every device points to the same cloud data.
+    let syncUserId = localStorage.getItem('habitTracker_syncId') || '';
+    let firebaseUnsubscribe = null;
+    let firebaseReady = false;
+    let applyingRemoteState = false;
+    let lastRemoteJson = '';
+
+    if (!syncUserId) {
+        syncUserId = 'user-' + Math.random().toString(36).substr(2, 8);
+        localStorage.setItem('habitTracker_syncId', syncUserId);
+    }
+
+    let state = {
+        habits: [],
+        checks: {},
+        mood: [],
+        motivation: [],
+        savedTimerMins: 25
+    };
+
+    let dailyChart, weeklyChart, overallChart, mentalChart;
+
+    // Timer Variables
+    let timerDuration = 25 * 60;
+    let timerTimeLeft = timerDuration;
+    let timerInterval = null;
+    let isTimerRunning = false;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        setupDateControls();
+        loadData();
+        await setupFirebaseSync();
+    });
+
+    function setupDateControls() {
+        const yearSelect = document.getElementById('year-select');
+        const monthSelect = document.getElementById('month-select');
+
+        for (let y = 2025; y <= 2028; y++) {
+            const opt = document.createElement('option');
+            opt.value = y; opt.innerText = y;
+            if (y === currentYear) opt.selected = true;
+            yearSelect.appendChild(opt);
+        }
+
+        monthNames.forEach((m, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx; opt.innerText = m;
+            if (idx === currentMonth) opt.selected = true;
+            monthSelect.appendChild(opt);
+        });
+    }
+
+    async function changeCalendarMonth() {
+        currentYear = parseInt(document.getElementById('year-select').value);
+        currentMonth = parseInt(document.getElementById('month-select').value);
+
+        // Load this month's local state before attaching the listener.
+        loadData();
+        await setupFirebaseSync();
+    }
+
+    function calculateDaysInMonth() {
+        daysTotal = new Date(currentYear, currentMonth + 1, 0).getDate();
+        document.getElementById('current-month-display').innerText = `- ${monthNames[currentMonth]} ${currentYear} (${daysTotal} DAYS) -`;
+    }
+
+    function loadData() {
+        calculateDaysInMonth();
+
+        const saved = localStorage.getItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`);
+
+        if (saved) {
+            try {
+                state = JSON.parse(saved);
+            } catch (error) {
+                console.warn('Local data is corrupted; creating fresh month state.', error);
+                createDefaultState();
+            }
+        } else {
+            createDefaultState();
+        }
+
+        normalizeState();
+
+        // Apply saved timer duration.
+        if (state.savedTimerMins) {
+            timerDuration = state.savedTimerMins * 60;
+            timerTimeLeft = timerDuration;
+            document.getElementById('timer-custom-input').value = state.savedTimerMins;
+            updateTimerDisplay();
+        }
+
+        renderHeaderRow();
+        renderTable();
+        initCharts();
+        updateAll();
+    }
+
+    function createDefaultState() {
+        state = {
+            habits: [...defaultHabits],
+            checks: {},
+            mood: Array(daysTotal).fill(7),
+            motivation: Array(daysTotal).fill(8),
+            savedTimerMins: 25
+        };
+
+        state.habits.forEach((_, idx) => {
+            state.checks[idx] = Array(daysTotal).fill(false);
+        });
+    }
+
+    function normalizeState() {
+        if (!Array.isArray(state.habits)) state.habits = [...defaultHabits];
+        if (!state.checks || typeof state.checks !== 'object') state.checks = {};
+        if (!Array.isArray(state.mood)) state.mood = Array(daysTotal).fill(7);
+        if (!Array.isArray(state.motivation)) state.motivation = Array(daysTotal).fill(8);
+        if (!state.savedTimerMins) state.savedTimerMins = 25;
+
+        state.habits.forEach((_, idx) => {
+            if (!Array.isArray(state.checks[idx])) {
+                state.checks[idx] = Array(daysTotal).fill(false);
+            } else if (state.checks[idx].length !== daysTotal) {
+                state.checks[idx] = Array.from(
+                    { length: daysTotal },
+                    (_, i) => Boolean(state.checks[idx][i])
+                );
+            }
+        });
+
+        state.mood = Array.from(
+            { length: daysTotal },
+            (_, i) => Number.isFinite(Number(state.mood[i])) ? Number(state.mood[i]) : 7
+        );
+
+        state.motivation = Array.from(
+            { length: daysTotal },
+            (_, i) => Number.isFinite(Number(state.motivation[i])) ? Number(state.motivation[i]) : 8
+        );
+    }
+
+    function saveData(options = {}) {
+        normalizeState();
+
+        // Always keep a local backup, so the app remains usable offline.
+        localStorage.setItem(
+            `darkHabitTrackerState_${currentYear}_${currentMonth}`,
+            JSON.stringify(state)
+        );
+
+        // Do not echo an incoming Firebase update back to Firebase.
+        if (!options.remote && !applyingRemoteState) {
+            pushToFirebase();
+        }
+    }
+
+    async function setupFirebaseSync() {
+        if (!window.db || !window.dbRef || !window.dbOnValue) {
+            console.warn('Firebase SDK is not ready.');
+            return;
+        }
+
+        if (firebaseUnsubscribe) {
+            firebaseUnsubscribe();
+            firebaseUnsubscribe = null;
+        }
+
+        firebaseReady = false;
+
+        const userRef = window.dbRef(
+            window.db,
+            `users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}`
+        );
+
+        firebaseUnsubscribe = window.dbOnValue(userRef, (snapshot) => {
+            const data = snapshot.val();
+
+            if (!data) {
+                // First device/month: publish its local state.
+                firebaseReady = true;
+                setSyncStatus('☁ Connected');
+                pushToFirebase();
+                return;
+            }
+
+            const incoming = JSON.stringify(data);
+
+            // Ignore the exact same payload.
+            if (incoming === lastRemoteJson) {
+                firebaseReady = true;
+                setSyncStatus('☁ Synced');
+                return;
+            }
+
+            lastRemoteJson = incoming;
+            applyingRemoteState = true;
+
+            try {
+                state = data;
+                normalizeState();
+
+                localStorage.setItem(
+                    `darkHabitTrackerState_${currentYear}_${currentMonth}`,
+                    JSON.stringify(state)
+                );
+
+                renderTable();
+                updateAll();
+
+                if (state.savedTimerMins) {
+                    timerDuration = Number(state.savedTimerMins) * 60;
+                    if (!isTimerRunning) {
+                        timerTimeLeft = timerDuration;
+                        updateTimerDisplay();
+                        document.getElementById('timer-custom-input').value = state.savedTimerMins;
+                    }
+                }
+            } finally {
+                applyingRemoteState = false;
+            }
+
+            firebaseReady = true;
+            setSyncStatus('☁ Synced');
+        }, (error) => {
+            console.error('Firebase sync error:', error);
+            firebaseReady = false;
+            setSyncStatus('⚠ Offline');
+        });
+    }
+
+    function setSyncStatus(text) {
+        const el = document.getElementById('sync-status');
+        if (el) el.innerText = text;
+    }
+
+    function pushToFirebase() {
+        if (!window.db || !window.dbSet || !window.dbRef || !firebaseReady) {
+            return;
+        }
+
+        normalizeState();
+
+        const userRef = window.dbRef(
+            window.db,
+            `users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}`
+        );
+
+        const payload = JSON.parse(JSON.stringify(state));
+        lastRemoteJson = JSON.stringify(payload);
+
+        window.dbSet(userRef, payload).catch((error) => {
+            console.error('Could not save to Firebase:', error);
+        });
+    }
+
+    async function syncPrompt() {
+        const input = prompt(
+            "Enter the SAME Sync ID on your PC and phone.\\n\\nCurrent Sync ID:",
+            syncUserId
+        );
+
+        if (!input || !input.trim()) return;
+
+        const newId = input.trim().replace(/[.#$\\[\\]/]/g, '');
+
+        if (!newId) {
+            alert('Invalid Sync ID.');
+            return;
+        }
+
+        syncUserId = newId;
+        localStorage.setItem('habitTracker_syncId', syncUserId);
+
+        await setupFirebaseSync();
+
+        alert(
+            "Sync ID saved.\\n\\n" +
+            "Use this exact same ID on your phone and PC:\\n" +
+            syncUserId
+        );
+    }
+
+    function renderHeaderRow() {
+        const weeksRow = document.getElementById('weeks-header-row');
+        const daysRow = document.getElementById('days-header-row');
+
+        weeksRow.innerHTML = '<th rowspan="2" class="habit-title-col">My Habits</th>';
+        daysRow.innerHTML = '';
+
+        let weekCount = 1;
+        let dayInWeek = 0;
+
+        for (let i = 1; i <= daysTotal; i++) {
+            dayInWeek++;
+            if (i === 1 || dayInWeek === 1) {
+                const weekTh = document.createElement('th');
+                weekTh.className = 'week-header';
+                const span = Math.min(7 - (dayInWeek - 1), daysTotal - i + 1);
+                weekTh.colSpan = span;
+                weekTh.innerText = `W${weekCount++}`;
+                weeksRow.appendChild(weekTh);
+            }
+            if (dayInWeek === 7) dayInWeek = 0;
+
+            const date = new Date(currentYear, currentMonth, i);
+            const dayIndex = (date.getDay() + 6) % 7; // Monday-first
+            const dayName = daysOfWeek[dayIndex];
+            const isWeekend = (dayName === "Sa" || dayName === "Su");
+
+            const th = document.createElement('th');
+            th.className = `day-header ${isWeekend ? 'is-weekend' : ''}`;
+            th.innerHTML = `<span class="sub-header">${dayName}</span><br>${i}`;
+            daysRow.appendChild(th);
+        }
+
+        const analysisTh = document.createElement('th');
+        analysisTh.colSpan = 5;
+        analysisTh.className = 'week-header';
+        analysisTh.innerText = 'Analysis';
+        weeksRow.appendChild(analysisTh);
+
+        const analysisHeaders = ['Goal', 'Achiev.', 'Left', 'Progress', '%'];
+        analysisHeaders.forEach(text => {
+            const th = document.createElement('th');
+            th.innerText = text;
+            th.style.width = '45px';
+            daysRow.appendChild(th);
+        });
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('habits-tbody');
+        tbody.innerHTML = '';
+
+        state.habits.forEach((habit, hIdx) => {
+            const tr = document.createElement('tr');
+
+            const nameTd = document.createElement('td');
+            nameTd.className = 'habit-title-col';
+            nameTd.innerHTML = `<span>${habit}</span><span class="delete-btn" onclick="deleteHabit(${hIdx})">×</span>`;
+            tr.appendChild(nameTd);
+
+            if (!state.checks[hIdx]) state.checks[hIdx] = Array(daysTotal).fill(false);
+
+            for (let d = 0; d < daysTotal; d++) {
+                const date = new Date(currentYear, currentMonth, d + 1);
+                const dayName = daysOfWeek[(date.getDay() + 6) % 7];
+                const isWeekend = (dayName === "Sa" || dayName === "Su");
+
+                const td = document.createElement('td');
+                if (isWeekend) td.className = 'is-weekend';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = state.checks[hIdx][d] || false;
+                checkbox.addEventListener('change', (e) => {
+                    state.checks[hIdx][d] = e.target.checked;
+                    saveData();
+                    updateAll();
+                });
+                td.appendChild(checkbox);
+                tr.appendChild(td);
+            }
+
+            const goalTd = document.createElement('td'); goalTd.id = `goal-${hIdx}`;
+            const achievTd = document.createElement('td'); achievTd.id = `achiev-${hIdx}`;
+            const leftTd = document.createElement('td'); leftTd.id = `left-${hIdx}`;
+            const progressTd = document.createElement('td');
+            progressTd.innerHTML = `<div class="progress-bar-outer"><div class="progress-bar-inner" id="pbar-${hIdx}"></div></div>`;
+            const pctTd = document.createElement('td'); pctTd.id = `pct-${hIdx}`;
+            pctTd.style.fontWeight = '700';
+
+            tr.appendChild(goalTd); tr.appendChild(achievTd); tr.appendChild(leftTd);
+            tr.appendChild(progressTd); tr.appendChild(pctTd);
+
+            tbody.appendChild(tr);
+        });
+
+        renderMentalInputs();
+        populateTimerHabits();
+        renderMobileTodayList();
+    }
+
+    function renderMobileTodayList() {
+        const todayDay = new Date().getDate();
+        const activeDay = Math.min(todayDay, daysTotal) - 1;
+        document.getElementById('today-day-num').innerText = activeDay + 1;
+
+        const container = document.getElementById('mobile-today-list');
+        container.innerHTML = '';
+
+        state.habits.forEach((habit, hIdx) => {
+            const li = document.createElement('li');
+            li.className = 'mobile-today-item';
+            
+            const label = document.createElement('span');
+            label.innerText = habit;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = state.checks[hIdx][activeDay] || false;
+            checkbox.addEventListener('change', (e) => {
+                state.checks[hIdx][activeDay] = e.target.checked;
+                saveData();
+                renderTable();
+                updateAll();
+            });
+
+            li.appendChild(label);
+            li.appendChild(checkbox);
+            container.appendChild(li);
+        });
+    }
+
+    function renderMentalInputs() {
+        const moodRow = document.getElementById('mood-row');
+        const motivationRow = document.getElementById('motivation-row');
+
+        while (moodRow.children.length > 1) moodRow.removeChild(moodRow.lastChild);
+        while (motivationRow.children.length > 1) motivationRow.removeChild(motivationRow.lastChild);
+
+        for (let d = 0; d < daysTotal; d++) {
+            const date = new Date(currentYear, currentMonth, d + 1);
+            const dayName = daysOfWeek[(date.getDay() + 6) % 7];
+            const isWeekend = (dayName === "Sa" || dayName === "Su");
+
+            const mTd = document.createElement('td');
+            if (isWeekend) mTd.className = 'is-weekend';
+            const mInput = document.createElement('input');
+            mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
+            mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
+            mInput.addEventListener('change', (e) => {
+                state.mood[d] = parseInt(e.target.value) || 0;
+                saveData();
+                updateMentalChart();
+            });
+            mTd.appendChild(mInput);
+            moodRow.appendChild(mTd);
+
+            const motTd = document.createElement('td');
+            if (isWeekend) motTd.className = 'is-weekend';
+            const motInput = document.createElement('input');
+            motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
+            motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
+            motInput.addEventListener('change', (e) => {
+                state.motivation[d] = parseInt(e.target.value) || 0;
+                saveData();
+                updateMentalChart();
+            });
+            motTd.appendChild(motInput);
+            motivationRow.appendChild(motTd);
+        }
+    }
+
+    function populateTimerHabits() {
+        const select = document.getElementById('timer-habit-select');
+        select.innerHTML = '<option value="-1">-- Select Habit --</option>';
+        state.habits.forEach((h, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.innerText = h;
+            select.appendChild(opt);
+        });
+    }
+
+    /* Timer Logic */
+    function setPresetTime(minutes) {
+        document.getElementById('timer-custom-input').value = minutes;
+        applyNewTime(minutes);
+    }
+
+    function setCustomTime(minutes) {
+        applyNewTime(minutes);
+    }
+
+    function applyNewTime(minutes) {
+        const mins = parseInt(minutes, 10);
+        if (mins && mins > 0) {
+            state.savedTimerMins = mins;
+            timerDuration = mins * 60;
+            saveData();
+            resetTimer();
+        }
+    }
+
+    function toggleTimer() {
+        const btn = document.getElementById('timer-start-btn');
+        if (isTimerRunning) {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            btn.innerText = 'Start';
+            btn.className = 'btn btn-primary';
+        } else {
+            isTimerRunning = true;
+            btn.innerText = 'Pause';
+            btn.className = 'btn';
+            timerInterval = setInterval(() => {
+                if (timerTimeLeft > 0) {
+                    timerTimeLeft--;
+                    updateTimerDisplay();
+                } else {
+                    clearInterval(timerInterval);
+                    isTimerRunning = false;
+                    btn.innerText = 'Start';
+                    btn.className = 'btn btn-primary';
+                    playAudioAlert();
+                    alert('🎉 Focus Session Completed!');
+                }
+            }, 1000);
+        }
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        timerTimeLeft = timerDuration;
+        updateTimerDisplay();
+        const btn = document.getElementById('timer-start-btn');
+        btn.innerText = 'Start';
+        btn.className = 'btn btn-primary';
+    }
+
+    function updateTimerDisplay() {
+        const mins = Math.floor(timerTimeLeft / 60);
+        const secs = timerTimeLeft % 60;
+        document.getElementById('timer-display').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function playAudioAlert() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.8);
+    }
+
+    function toggleAnalytics() {
+        const sec = document.getElementById('analytics-section');
+        sec.classList.toggle('show');
+    }
+
+    function updateAll() {
+        let totalPossible = state.habits.length * daysTotal;
+        let totalCompleted = 0;
+        const dailyCounts = Array(daysTotal).fill(0);
+        const habitStats = [];
+
+        state.habits.forEach((habit, hIdx) => {
+            const checks = state.checks[hIdx] || Array(daysTotal).fill(false);
+            const completed = checks.filter(Boolean).length;
+            const goal = daysTotal;
+            const left = goal - completed;
+            const pct = Math.round((completed / goal) * 100);
+
+            totalCompleted += completed;
+
+            if (document.getElementById(`goal-${hIdx}`)) {
+                document.getElementById(`goal-${hIdx}`).innerText = goal;
+                document.getElementById(`achiev-${hIdx}`).innerText = completed;
+                document.getElementById(`left-${hIdx}`).innerText = left;
+                document.getElementById(`pct-${hIdx}`).innerText = `${pct}%`;
+                document.getElementById(`pbar-${hIdx}`).style.width = `${pct}%`;
+            }
+
+            checks.forEach((chk, dIdx) => {
+                if (chk) dailyCounts[dIdx]++;
+            });
+
+            habitStats.push({ name: habit, completed, pct });
+        });
+
+        const totalLeft = totalPossible - totalCompleted;
+
+        document.getElementById('stat-goal').innerText = totalPossible;
+        document.getElementById('stat-completed').innerText = totalCompleted;
+        document.getElementById('stat-left').innerText = totalLeft;
+
+        updateDailyChart(dailyCounts);
+        updateWeeklyChart(dailyCounts);
+        updateOverallChart(totalCompleted, totalLeft);
+        updateTopHabitsList(habitStats);
+        updateMentalChart();
+    }
+
+    function initCharts() {
+        const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+        const dailyLabels = Array.from({length: daysTotal}, (_, i) => i + 1);
+
+        dailyChart = new Chart(ctxDaily, {
+            type: 'bar',
+            data: { labels: dailyLabels, datasets: [{ data: [], backgroundColor: '#ffffff', borderRadius: 2 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#888888', font: { size: 8 } } },
+                    y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } }, beginAtZero: true }
+                }
+            }
+        });
+
+        const ctxWeekly = document.getElementById('weeklyChart').getContext('2d');
+        weeklyChart = new Chart(ctxWeekly, {
+            type: 'bar',
+            data: { labels: ['W1', 'W2', 'W3', 'W4', 'W5'], datasets: [{ data: [], backgroundColor: '#aaaaaa', borderRadius: 3 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 9 } } },
+                    y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888' }, beginAtZero: true }
+                }
+            }
+        });
+
+        const ctxOverall = document.getElementById('overallChart').getContext('2d');
+        overallChart = new Chart(ctxOverall, {
+            type: 'doughnut',
+            data: { labels: ['Completed', 'Left'], datasets: [{ data: [0, 100], backgroundColor: ['#ffffff', '#333333'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
+        });
+
+        const ctxMental = document.getElementById('mentalChart').getContext('2d');
+        mentalChart = new Chart(ctxMental, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: daysTotal}, (_, i) => i + 1),
+                datasets: [
+                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2 },
+                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } },
+                    y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } }
+                }
+            }
+        });
+    }
+
+    function updateDailyChart(counts) { dailyChart.data.labels = Array.from({length: daysTotal}, (_, i) => i + 1); dailyChart.data.datasets[0].data = counts; dailyChart.update(); }
+    function updateWeeklyChart(dailyCounts) {
+        const weeks = [
+            dailyCounts.slice(0, 7).reduce((a, b) => a + b, 0),
+            dailyCounts.slice(7, 14).reduce((a, b) => a + b, 0),
+            dailyCounts.slice(14, 21).reduce((a, b) => a + b, 0),
+            dailyCounts.slice(21, 28).reduce((a, b) => a + b, 0),
+            dailyCounts.slice(28, daysTotal).reduce((a, b) => a + b, 0)
+        ];
+        weeklyChart.data.datasets[0].data = weeks; weeklyChart.update();
+    }
+    function updateOverallChart(completed, left) { overallChart.data.datasets[0].data = [completed, left]; overallChart.update(); }
+    function updateMentalChart() { mentalChart.data.datasets[0].data = state.mood; mentalChart.data.datasets[1].data = state.motivation; mentalChart.update(); }
+    function updateTopHabitsList(stats) {
+        const sorted = [...stats].sort((a, b) => b.pct - a.pct).slice(0, 10);
+        const list = document.getElementById('top-habits-list');
+        list.innerHTML = '';
+        sorted.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.className = 'top-habit-item';
+            li.innerHTML = `<span>${index + 1}. ${item.name}</span><span style="font-weight: 700; color: #ffffff;">${item.pct}%</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    function addHabitPrompt() {
+        const name = prompt("Enter new habit name:");
+        if (name && name.trim()) {
+            state.habits.push(name.trim());
+            state.checks[state.habits.length - 1] = Array(daysTotal).fill(false);
+            saveData();
+            renderTable();
+            updateAll();
+        }
+    }
+
+    function deleteHabit(index) {
+        if (confirm(`Delete habit "${state.habits[index]}"?`)) {
+            state.habits.splice(index, 1);
+            delete state.checks[index];
+            const newChecks = {};
+            state.habits.forEach((_, i) => { newChecks[i] = state.checks[i] || Array(daysTotal).fill(false); });
+            state.checks = newChecks;
+            saveData();
+            renderTable();
+            updateAll();
+        }
+    }
+
+    function resetMonthData() {
+        if (confirm("Reset all marks for this month?")) {
+            state.habits.forEach((_, i) => { state.checks[i] = Array(daysTotal).fill(false); });
+            saveData();
+            renderTable();
+            updateAll();
+        }
+    }
+</script>
+</body>
+</html>
