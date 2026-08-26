@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -728,7 +728,7 @@
 
             <!-- Action Buttons -->
             <button id="add-habit-btn" class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
-            <button id="add-record-btn" class="btn btn-primary" onclick="addTransactionPrompt()" style="display: none;">+ Запис</button>
+            <button id="add-record-btn" class="btn btn-primary" onclick="addTransactionPrompt()" style="display: none;">+ Record</button>
             <button class="btn" onclick="openSyncModal()">Sync ID</button>
             <button id="reset-btn" class="btn" onclick="resetMonthData()">Reset</button>
         </div>
@@ -896,7 +896,7 @@
         <div class="card table-card">
             <div class="table-header">
                 <div class="widget-title" style="margin: 0;">Transaction Register</div>
-                <span id="b-records-count" style="font-size: 0.75rem; color: var(--text-secondary);">Всього записів: 0</span>
+                <span id="b-records-count" style="font-size: 0.75rem; color: var(--text-secondary);">Total entries: 0</span>
             </div>
             <table class="budget-table">
                 <thead>
@@ -915,23 +915,12 @@
         <div class="bottom-widgets">
             <div class="card">
                 <div class="widget-title">Category Analytics (Donut Chart)</div>
-                <div style="display: flex; align-items: center; gap: 24px; padding-top: 8px;">
-                    <svg class="donut" viewBox="0 0 36 36" style="width: 100px; height: 100px;">
-                        <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-red)" stroke-dasharray="50, 100" stroke-dashoffset="0" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-purple)" stroke-dasharray="25, 100" stroke-dashoffset="-50" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-blue)" stroke-dasharray="25, 100" stroke-dashoffset="-75" />
-                    </svg>
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
-                        <div style="font-size: 0.8rem; display: flex; justify-content: space-between;">
-                            <span>🟥 Продукти та побут</span> <b>50%</b>
-                        </div>
-                        <div style="font-size: 0.8rem; display: flex; justify-content: space-between;">
-                            <span>🟣 Накопичення</span> <b>25%</b>
-                        </div>
-                        <div style="font-size: 0.8rem; display: flex; justify-content: space-between;">
-                            <span>🟦 Відпочинок та інші витрати</span> <b>25%</b>
-                        </div>
+                <div style="display: flex; align-items: center; gap: 20px; padding-top: 8px;">
+                    <div style="width: 110px; height: 110px; flex-shrink: 0; position: relative;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div id="category-legend-list" style="flex: 1; display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;">
+                        <!-- Dynamic Categories -->
                     </div>
                 </div>
             </div>
@@ -1016,7 +1005,7 @@
         budget: []
     };
 
-    let dailyChart, weeklyChart, overallChart, mentalChart;
+    let dailyChart, weeklyChart, overallChart, mentalChart, categoryChart;
     let firebaseUnsubscribe = null;
     let isRemoteUpdate = false;
 
@@ -1105,7 +1094,6 @@
         if (!Array.isArray(state.habits)) state.habits = [...defaultHabits];
         if (!state.checks || typeof state.checks !== 'object') state.checks = {};
         
-        // Convert Firebase object back to array if needed
         if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
             state.budget = Object.values(state.budget);
         }
@@ -1153,7 +1141,7 @@
         localStorage.setItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`, JSON.stringify(state));
     }
 
-    /* --- Budget Functionality --- */
+    /* --- Budget Functionality & Dynamic Category Chart --- */
     function renderBudget() {
         const tbody = document.getElementById('budget-tbody');
         if (!tbody) return;
@@ -1167,19 +1155,19 @@
             const tr = document.createElement('tr');
 
             let tagClass = 'tag-income';
-            let tagText = 'Прибуток';
+            let tagText = 'Income';
             let amountPrefix = '+';
             let amountColor = 'var(--accent-green)';
 
             if (item.type === 'expense') {
                 tagClass = 'tag-expense';
-                tagText = 'Убиток';
+                tagText = 'Expense';
                 amountPrefix = '-';
                 amountColor = 'var(--accent-red)';
                 totalExpense += item.amount;
             } else if (item.type === 'saved') {
                 tagClass = 'tag-saved';
-                tagText = 'Відклав';
+                tagText = 'Saved';
                 amountPrefix = '-';
                 amountColor = 'var(--accent-purple)';
                 totalSaved += item.amount;
@@ -1187,13 +1175,12 @@
                 totalIncome += item.amount;
             }
 
-            // Data attributes added for responsive mobile labels
             tr.innerHTML = `
-                <td data-label="Дата">${item.date}</td>
-                <td data-label="Опис">${item.desc}</td>
-                <td data-label="Категорія">${item.cat}</td>
-                <td data-label="Тип"><span class="tag ${tagClass}">${tagText}</span></td>
-                <td data-label="Сума" style="font-weight: 700; color: ${amountColor};">
+                <td data-label="Date">${item.date}</td>
+                <td data-label="Description">${item.desc}</td>
+                <td data-label="Category">${item.cat}</td>
+                <td data-label="Type"><span class="tag ${tagClass}">${tagText}</span></td>
+                <td data-label="Sum" style="font-weight: 700; color: ${amountColor}; text-align: right;">
                     ${amountPrefix}${item.amount.toLocaleString()} ₴
                     <span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
                 </td>
@@ -1207,7 +1194,7 @@
         document.getElementById('b-total-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-total-expense').innerText = `-${totalExpense.toLocaleString()} ₴`;
         document.getElementById('b-total-saved').innerText = `${totalSaved.toLocaleString()} ₴`;
-        document.getElementById('b-records-count').innerText = `Всього записів: ${state.budget.length}`;
+        document.getElementById('b-records-count').innerText = `Total entries: ${state.budget.length}`;
 
         document.getElementById('b-summary-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
@@ -1220,21 +1207,106 @@
         document.getElementById('donut-income').setAttribute('stroke-dasharray', `100, 100`);
         document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
+
+        renderCategoryAnalytics();
+    }
+
+    function renderCategoryAnalytics() {
+        const categoryTotals = {};
+        let totalExpenseSum = 0;
+
+        state.budget.forEach(item => {
+            if (item.type === 'expense') {
+                const cat = item.cat || 'Other';
+                categoryTotals[cat] = (categoryTotals[cat] || 0) + item.amount;
+                totalExpenseSum += item.amount;
+            }
+        });
+
+        const categories = Object.keys(categoryTotals);
+        const values = categories.map(cat => categoryTotals[cat]);
+
+        const sortedIndices = categories.map((_, i) => i).sort((a, b) => values[b] - values[a]);
+        const sortedCategories = sortedIndices.map(i => categories[i]);
+        const sortedValues = sortedIndices.map(i => values[i]);
+
+        const colors = ['#ef4444', '#a855f7', '#3b82f6', '#eab308', '#06b6d4', '#ec4899', '#8b5cf6', '#10b981'];
+
+        const legendContainer = document.getElementById('category-legend-list');
+        if (legendContainer) {
+            legendContainer.innerHTML = '';
+            if (sortedCategories.length === 0) {
+                legendContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">No expenses recorded</span>';
+            } else {
+                sortedCategories.forEach((cat, idx) => {
+                    const amt = sortedValues[idx];
+                    const pct = totalExpenseSum > 0 ? Math.round((amt / totalExpenseSum) * 100) : 0;
+                    const color = colors[idx % colors.length];
+
+                    const row = document.createElement('div');
+                    row.style.cssText = 'font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;';
+                    row.innerHTML = `
+                        <span style="display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 10px; height: 10px; border-radius: 2px; background-color: ${color}; display: inline-block;"></span>
+                            ${cat}
+                        </span>
+                        <b>${pct}% (${amt.toLocaleString()} ₴)</b>
+                    `;
+                    legendContainer.appendChild(row);
+                });
+            }
+        }
+
+        const ctx = document.getElementById('categoryChart')?.getContext('2d');
+        if (ctx) {
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sortedCategories,
+                    datasets: [{
+                        data: sortedValues.length > 0 ? sortedValues : [1],
+                        backgroundColor: sortedValues.length > 0 ? sortedCategories.map((_, i) => colors[i % colors.length]) : ['#2d2d2d'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: sortedValues.length > 0,
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw || 0;
+                                    const pct = totalExpenseSum > 0 ? Math.round((value / totalExpenseSum) * 100) : 0;
+                                    return ` ${context.label}: ${value.toLocaleString()} ₴ (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
 
     function addTransactionPrompt() {
-        const desc = prompt("Введіть опис / джерело:");
+        const desc = prompt("Enter description / source:");
         if (!desc) return;
-        const cat = prompt("Введіть категорію (напр. Робота, Харчування, Відпочинок):", "Загальне");
-        const typeStr = prompt("Тип: 1 - Прибуток, 2 - Убиток, 3 - Відклав", "1");
-        const amountStr = prompt("Сума (₴):", "1000");
+        const cat = prompt("Enter category (e.g. Work, Food, Leisure):", "General");
+        const typeStr = prompt("Type: 1 - Income, 2 - Expense, 3 - Saved", "1");
+        const amountStr = prompt("Amount (₴):", "1000");
 
         let type = 'income';
         if (typeStr === '2') type = 'expense';
         if (typeStr === '3') type = 'saved';
 
         const amount = parseFloat(amountStr) || 0;
-        const dateNow = new Date().getDate() + " Серпня";
+        const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
 
         state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: cat.trim(), type, amount });
         saveLocalData();
@@ -1243,7 +1315,7 @@
     }
 
     function deleteTransaction(index) {
-        if (confirm("Видалити цей запис з бюджету?")) {
+        if (confirm("Delete this budget entry?")) {
             state.budget.splice(index, 1);
             saveLocalData();
             pushFullStateToFirebase();
