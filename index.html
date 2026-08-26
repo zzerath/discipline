@@ -42,6 +42,7 @@
             --row-alt: #161616;
             --table-header-bg: #222222;
             --weekend-bg: #242424;
+            --today-bg: rgba(255, 255, 255, 0.12);
         }
 
         * {
@@ -325,6 +326,11 @@
             background-color: var(--weekend-bg);
         }
 
+        .is-today {
+            background-color: var(--today-bg) !important;
+            font-weight: bold;
+        }
+
         .week-header {
             background: #000000;
             color: #ffffff;
@@ -388,38 +394,6 @@
             background: #ffffff;
             width: 0%;
             transition: width 0.3s;
-        }
-
-        /* Mobile Today's Focus View */
-        .mobile-today-card {
-            display: none;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .mobile-today-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .mobile-today-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px;
-            background: var(--row-alt);
-            border-radius: 6px;
-            border: 1px solid var(--card-border);
-        }
-
-        .mobile-today-item input[type="checkbox"] {
-            width: 22px;
-            height: 22px;
         }
 
         /* Bottom Grid: Mental State & Top Habits */
@@ -524,7 +498,22 @@
             .analytics-toggle-btn { display: block; }
             .analytics-collapsible { display: none; }
             .analytics-collapsible.show { display: flex; flex-direction: column; gap: 15px; }
-            .mobile-today-card { display: block; }
+
+            /* On Mobile: Hide all days except Today */
+            .day-header-col:not(.is-today),
+            .day-cell-col:not(.is-today),
+            .mental-cell-col:not(.is-today) {
+                display: none !important;
+            }
+
+            /* Hide weeks header row on mobile to fit nicely */
+            #weeks-header-row {
+                display: none !important;
+            }
+
+            th.habit-title-col {
+                rowspan: 1 !important;
+            }
         }
     </style>
 </head>
@@ -615,14 +604,6 @@
         </div>
     </div>
 
-    <!-- Mobile View: Today's Focus List -->
-    <div class="mobile-today-card">
-        <div class="card-header" style="text-align: left; margin-bottom: 10px;">Today's Habits (Day <span id="today-day-num">1</span>)</div>
-        <ul class="mobile-today-list" id="mobile-today-list">
-            <!-- Populated dynamically -->
-        </ul>
-    </div>
-
     <!-- Main Table Section -->
     <div class="table-container">
         <table id="habits-table">
@@ -700,8 +681,13 @@
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    let currentYear = 2026;
-    let currentMonth = 0; // January
+    // Restore saved month/year or fallback to current real date
+    const todayDateObj = new Date();
+    let currentYear = parseInt(localStorage.getItem('habitTracker_lastYear')) || todayDateObj.getFullYear();
+    let currentMonth = localStorage.getItem('habitTracker_lastMonth') !== null 
+        ? parseInt(localStorage.getItem('habitTracker_lastMonth')) 
+        : todayDateObj.getMonth();
+
     let daysTotal = 31;
 
     // Sync ID handling (URL param > LocalStorage > Random fallback)
@@ -738,6 +724,9 @@
         const yearSelect = document.getElementById('year-select');
         const monthSelect = document.getElementById('month-select');
 
+        yearSelect.innerHTML = '';
+        monthSelect.innerHTML = '';
+
         for (let y = 2025; y <= 2028; y++) {
             const opt = document.createElement('option');
             opt.value = y; opt.innerText = y;
@@ -756,6 +745,11 @@
     function changeCalendarMonth() {
         currentYear = parseInt(document.getElementById('year-select').value);
         currentMonth = parseInt(document.getElementById('month-select').value);
+
+        // Save selected month and year to LocalStorage
+        localStorage.setItem('habitTracker_lastYear', currentYear);
+        localStorage.setItem('habitTracker_lastMonth', currentMonth);
+
         calculateDaysInMonth();
         loadLocalData();
         setupFirebaseSync();
@@ -922,6 +916,11 @@
 
     /* --- Rendering Logic --- */
 
+    function isToday(dayNum) {
+        const now = new Date();
+        return now.getFullYear() === currentYear && now.getMonth() === currentMonth && now.getDate() === dayNum;
+    }
+
     function renderHeaderRow() {
         const weeksRow = document.getElementById('weeks-header-row');
         const daysRow = document.getElementById('days-header-row');
@@ -948,9 +947,10 @@
             const dayIndex = (date.getDay() + 6) % 7; // Monday-first
             const dayName = daysOfWeek[dayIndex];
             const isWeekend = (dayName === "Sa" || dayName === "Su");
+            const todayFlag = isToday(i);
 
             const th = document.createElement('th');
-            th.className = `day-header ${isWeekend ? 'is-weekend' : ''}`;
+            th.className = `day-header day-header-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             th.innerHTML = `<span class="sub-header">${dayName}</span><br>${i}`;
             daysRow.appendChild(th);
         }
@@ -988,9 +988,10 @@
                 const date = new Date(currentYear, currentMonth, d + 1);
                 const dayName = daysOfWeek[(date.getDay() + 6) % 7];
                 const isWeekend = (dayName === "Sa" || dayName === "Su");
+                const todayFlag = isToday(d + 1);
 
                 const td = document.createElement('td');
-                if (isWeekend) td.className = 'is-weekend';
+                td.className = `day-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -1024,42 +1025,6 @@
 
         renderMentalInputs();
         populateTimerHabits();
-        renderMobileTodayList();
-    }
-
-    function renderMobileTodayList() {
-        const todayDay = new Date().getDate();
-        const activeDay = Math.min(todayDay, daysTotal) - 1;
-        document.getElementById('today-day-num').innerText = activeDay + 1;
-
-        const container = document.getElementById('mobile-today-list');
-        container.innerHTML = '';
-
-        state.habits.forEach((habit, hIdx) => {
-            const li = document.createElement('li');
-            li.className = 'mobile-today-item';
-            
-            const label = document.createElement('span');
-            label.innerText = habit;
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = Boolean(state.checks[hIdx]?.[activeDay]);
-            checkbox.addEventListener('change', (e) => {
-                const checkedVal = e.target.checked;
-                state.checks[hIdx][activeDay] = checkedVal;
-                saveLocalData();
-                if (!isRemoteUpdate) {
-                    updateRemoteField(`checks/${hIdx}/${activeDay}`, checkedVal);
-                }
-                renderTable();
-                updateAll();
-            });
-
-            li.appendChild(label);
-            li.appendChild(checkbox);
-            container.appendChild(li);
-        });
     }
 
     function renderMentalInputs() {
@@ -1073,9 +1038,10 @@
             const date = new Date(currentYear, currentMonth, d + 1);
             const dayName = daysOfWeek[(date.getDay() + 6) % 7];
             const isWeekend = (dayName === "Sa" || dayName === "Su");
+            const todayFlag = isToday(d + 1);
 
             const mTd = document.createElement('td');
-            if (isWeekend) mTd.className = 'is-weekend';
+            mTd.className = `mental-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const mInput = document.createElement('input');
             mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
             mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
@@ -1092,7 +1058,7 @@
             moodRow.appendChild(mTd);
 
             const motTd = document.createElement('td');
-            if (isWeekend) motTd.className = 'is-weekend';
+            motTd.className = `mental-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const motInput = document.createElement('input');
             motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
             motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
