@@ -1199,12 +1199,13 @@
         document.getElementById('b-summary-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
 
+        const incomePct = totalIncome > 0 ? 100 : 0;
         const balancePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalBalance / totalIncome) * 100))) : 0;
         const expensePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalExpense / totalIncome) * 100))) : 0;
         const savedPct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalSaved / totalIncome) * 100))) : 0;
-
+        
         document.getElementById('donut-balance').setAttribute('stroke-dasharray', `${balancePct}, 100`);
-        document.getElementById('donut-income').setAttribute('stroke-dasharray', `100, 100`);
+        document.getElementById('donut-income').setAttribute('stroke-dasharray', `${incomePct}, 100`);
         document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
 
