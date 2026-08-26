@@ -1348,7 +1348,13 @@
 
                     isRemoteUpdate = true;
                     try {
-                        state = { ...state, ...remoteData };
+                        state = {
+    ...state,
+    ...remoteData,
+    budget: remoteData.budget 
+        ? (Array.isArray(remoteData.budget) ? remoteData.budget : Object.values(remoteData.budget)) 
+        : []
+};
                         normalizeState();
                         saveLocalData();
 
