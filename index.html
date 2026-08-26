@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard: Habits & Financial Tracker</title>
+    <title>Habit Tracker & Financial Dashboard</title>
     <!-- Google Fonts & Chart.js -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,16 +37,14 @@
             --card-bg: #1e1e1e;
             --card-border: #2d2d2d;
             --text-dark: #f0f0f0;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
             --text-muted: #888888;
             --accent-black: #080808;
             --row-alt: #161616;
             --table-header-bg: #222222;
             --weekend-bg: #242424;
             --today-bg: rgba(255, 255, 255, 0.12);
-
-            /* Budget Colors */
-            --text-primary: #ffffff;
-            --text-secondary: #aaaaaa;
             --accent-green: #22c55e;
             --accent-red: #ef4444;
             --accent-purple: #a855f7;
@@ -58,7 +56,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
         body {
@@ -71,18 +69,6 @@
             min-height: 100vh;
         }
 
-        /* Tabs Container */
-        .tab-content {
-            width: 100%;
-            display: none;
-        }
-
-        .tab-content.active {
-            display: flex;
-            justify-content: center;
-        }
-
-        /* HABITS TRACKER STYLES */
         .dashboard-container {
             width: 100%;
             max-width: 1480px;
@@ -96,6 +82,7 @@
             gap: 20px;
         }
 
+        /* Top Bar Controls */
         .top-navbar {
             display: flex;
             justify-content: space-between;
@@ -171,6 +158,14 @@
             outline: none;
         }
 
+        .view-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* Habit Tracker Styles */
         .analytics-toggle-btn {
             display: none;
             width: 100%;
@@ -301,7 +296,7 @@
             border-radius: 6px;
         }
 
-        #habits-table {
+        table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
@@ -309,13 +304,13 @@
             color: var(--text-dark);
         }
 
-        #habits-table th, #habits-table td {
+        th, td {
             border: 1px solid var(--card-border);
             padding: 5px 2px;
             white-space: nowrap;
         }
 
-        #habits-table th {
+        th {
             background: var(--table-header-bg);
             color: #ffffff;
             font-weight: 600;
@@ -352,7 +347,7 @@
 
         .sub-header { font-size: 9px; color: var(--text-muted); }
 
-        #habits-tbody tr:nth-child(even) { background-color: var(--row-alt); }
+        tr:nth-child(even) { background-color: var(--row-alt); }
 
         input[type="checkbox"] {
             appearance: none;
@@ -384,26 +379,20 @@
             line-height: 1;
         }
 
-        .progress-ring {
-            width: 22px;
-            height: 22px;
-            transform: rotate(-90deg);
-            display: block;
+        .progress-bar-outer {
+            width: 50px;
+            height: 7px;
+            background: #333333;
+            border-radius: 4px;
+            overflow: hidden;
             margin: 0 auto;
         }
 
-        .ring-bg {
-            fill: none;
-            stroke: #333333;
-            stroke-width: 4;
-        }
-
-        .ring-meter {
-            fill: none;
-            stroke: #ffffff;
-            stroke-width: 4;
-            stroke-linecap: round;
-            transition: stroke-dasharray 0.3s ease;
+        .progress-bar-inner {
+            height: 100%;
+            background: #ffffff;
+            width: 0%;
+            transition: width 0.3s;
         }
 
         .mobile-habits-container {
@@ -511,6 +500,126 @@
             font-weight: bold;
         }
 
+        /* Budget Tracker Styles */
+        .widget-title {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .donut-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .donut-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-val { font-size: 1.1rem; font-weight: 700; }
+
+        svg.donut {
+            width: 70px;
+            height: 70px;
+            transform: rotate(-90deg);
+        }
+
+        circle.bg {
+            fill: none;
+            stroke: #2d2d2d;
+            stroke-width: 4;
+        }
+
+        circle.meter {
+            fill: none;
+            stroke-width: 4;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s;
+        }
+
+        .top-widgets {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .table-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .budget-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        .budget-table th {
+            background: #181818;
+            color: var(--text-secondary);
+            padding: 10px 12px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--card-border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .budget-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--card-border);
+            text-align: left;
+        }
+
+        .tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .tag-income { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
+        .tag-expense { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+        .tag-saved { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+
+        .bottom-widgets {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+        }
+
+        .category-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .cat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #181818;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid var(--card-border);
+        }
+
+        /* Modal Box for Sync */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -542,203 +651,51 @@
             display: inline-block;
         }
 
-        /* BUDGET TRACKER SPECIFIC STYLES */
-        .budget-dashboard {
-            width: 100%;
-            max-width: 1200px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .budget-dashboard .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 8px;
-        }
-
-        .budget-dashboard .header-title h1 {
-            font-size: 1.4rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            font-weight: 800;
-        }
-
-        .budget-dashboard .header-title span {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-
-        .budget-dashboard .controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .budget-dashboard .top-widgets {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-        }
-
-        .budget-dashboard .widget-title {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        .budget-dashboard .donut-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .budget-dashboard .donut-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .budget-dashboard .stat-label { font-size: 0.7rem; color: var(--text-secondary); }
-        .budget-dashboard .stat-val { font-size: 1.1rem; font-weight: 700; }
-
-        .budget-dashboard svg.donut {
-            width: 70px;
-            height: 70px;
-            transform: rotate(-90deg);
-        }
-
-        .budget-dashboard circle.bg {
-            fill: none;
-            stroke: #2d2d2d;
-            stroke-width: 4;
-        }
-
-        .budget-dashboard circle.meter {
-            fill: none;
-            stroke-width: 4;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.3s;
-        }
-
-        .budget-dashboard .table-card {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .budget-dashboard .table-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .budget-dashboard table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            text-align: left;
-        }
-
-        .budget-dashboard th {
-            background: #181818;
-            color: var(--text-secondary);
-            padding: 10px 12px;
-            font-weight: 600;
-            border-bottom: 1px solid var(--card-border);
-            text-transform: uppercase;
-            font-size: 0.75rem;
-        }
-
-        .budget-dashboard td {
-            padding: 12px;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        .budget-dashboard tr:last-child td { border-bottom: none; }
-
-        .tag {
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .tag-income { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
-        .tag-expense { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
-        .tag-saved { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
-
-        .budget-dashboard .bottom-widgets {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 16px;
-        }
-
-        .budget-dashboard .category-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .budget-dashboard .cat-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #181818;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            border: 1px solid var(--card-border);
-        }
-
+        /* Responsive */
         @media (max-width: 900px) {
             body { padding: 8px; }
             .dashboard-container { padding: 12px; gap: 15px; }
-            .analytics-grid { display: flex; flex-direction: column; }
-            .bottom-grid { display: flex; flex-direction: column; }
+            .analytics-grid, .bottom-grid, .top-widgets, .bottom-widgets { display: flex; flex-direction: column; }
             .analytics-toggle-btn { display: block; }
             .analytics-collapsible { display: none; }
             .analytics-collapsible.show { display: flex; flex-direction: column; gap: 15px; }
-
             .table-container { display: none; }
             .mobile-habits-container { display: flex; }
-
             .mental-inputs-table { display: none; }
             .mobile-mental-inputs { display: flex; }
-
-            .budget-dashboard .top-widgets { grid-template-columns: repeat(2, 1fr); }
-            .budget-dashboard .bottom-widgets { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-<!-- TAB 1: HABITS TRACKER -->
-<div id="tab-habits" class="tab-content active">
-    <div class="dashboard-container">
-        <!-- Top Navigation -->
-        <div class="top-navbar">
-            <div>
-                <h1>HABIT TRACKER</h1>
-                <span id="current-month-display" style="font-size: 11px; opacity: 0.7; font-weight: 500;">- MONTH -</span>
-            </div>
-            <div class="controls-group">
-                <button class="btn btn-primary btn-tab-habits" onclick="switchTab('habits')">📋 Звички</button>
-                <button class="btn btn-tab-budget" onclick="switchTab('budget')">💰 Бюджет</button>
-                <span id="sync-status" class="sync-badge">☁ Ready</span>
-                <select id="year-select" onchange="changeCalendarMonth()"></select>
-                <select id="month-select" onchange="changeCalendarMonth()"></select>
-                <button class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
-                <button class="btn" onclick="openSyncModal()">⚡ Sync</button>
-                <button class="btn" onclick="resetMonthData()">Reset</button>
-            </div>
+<div class="dashboard-container">
+    <!-- Unified Top Navigation Bar -->
+    <div class="top-navbar">
+        <div>
+            <h1 id="app-title">HABIT TRACKER</h1>
+            <span id="current-month-display" style="font-size: 11px; opacity: 0.7; font-weight: 500;">- MONTH -</span>
         </div>
+        <div class="controls-group">
+            <span id="sync-status" class="sync-badge">☁ Ready</span>
+            
+            <!-- Navigation View Switches -->
+            <button id="nav-habits-btn" class="btn btn-primary" onclick="switchTab('habits')">📋 Звички</button>
+            <button id="nav-budget-btn" class="btn" onclick="switchTab('budget')">💰 Бюджет</button>
 
+            <!-- Date Selectors -->
+            <select id="year-select" onchange="changeCalendarMonth()"></select>
+            <select id="month-select" onchange="changeCalendarMonth()"></select>
+
+            <!-- Action Buttons -->
+            <button id="add-habit-btn" class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
+            <button id="add-record-btn" class="btn btn-primary" onclick="addTransactionPrompt()" style="display: none;">+ Запис</button>
+            <button class="btn" onclick="openSyncModal()">Sync ID</button>
+            <button id="reset-btn" class="btn" onclick="resetMonthData()">Reset</button>
+        </div>
+    </div>
+
+    <!-- 1. HABITS TRACKER TAB VIEW -->
+    <div id="habits-tab-view" class="view-section">
         <!-- Analytics Toggle for Mobile -->
         <button class="btn analytics-toggle-btn" onclick="toggleAnalytics()">📊 Analytics / Timer</button>
 
@@ -802,7 +759,7 @@
         <!-- Mobile Clean Habit List View -->
         <div class="mobile-habits-container" id="mobile-habits-list"></div>
 
-        <!-- Bottom Grid: Mental State & Top Habits -->
+        <!-- Bottom Section: Mental State & Top Habits -->
         <div class="bottom-grid">
             <div class="card mental-state-card">
                 <div class="card-header" style="text-align: left;">Mental State (Mood & Motivation)</div>
@@ -840,39 +797,21 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- TAB 2: BUDGET TRACKER -->
-<div id="tab-budget" class="tab-content">
-    <div class="budget-dashboard">
-        <!-- Шапка[cite: 3] -->
-        <div class="header">
-            <div class="header-title">
-                <h1>FINANCIAL TRACKER</h1>
-                <span>- AUGUST 2026 -</span>
-            </div>
-            <div class="controls">
-                <button class="btn btn-tab-habits" onclick="switchTab('habits')">📋 Звички</button>
-                <button class="btn btn-primary btn-tab-budget" onclick="switchTab('budget')">💰 Бюджет</button>
-                <select><option>2026</option></select>
-                <select><option>Серпень</option></select>
-                <button class="btn btn-primary">+ Запис</button>
-                <button class="btn" onclick="openSyncModal()">Sync ID</button>
-            </div>
-        </div>
-
-        <!-- 1. Верхні віджети з кільцевими діаграмами (Donuts)[cite: 3] -->
+    <!-- 2. BUDGET TRACKER TAB VIEW -->
+    <div id="budget-tab-view" class="view-section" style="display: none;">
+        <!-- Top Widgets Donuts -->
         <div class="top-widgets">
             <div class="card">
                 <div class="widget-title">Загальний бюджет</div>
                 <div class="donut-container">
                     <div class="donut-stats">
                         <span class="stat-label">ЗАЛИШОК</span>
-                        <span class="stat-val">12,500 ₴</span>
+                        <span class="stat-val" id="b-total-balance">0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
                         <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-blue)" stroke-dasharray="41, 100" />
+                        <circle class="meter" id="donut-balance" cx="18" cy="18" r="15.9155" stroke="var(--accent-blue)" stroke-dasharray="0, 100" />
                     </svg>
                 </div>
             </div>
@@ -882,11 +821,11 @@
                 <div class="donut-container">
                     <div class="donut-stats">
                         <span class="stat-label">ОТРИМАНО</span>
-                        <span class="stat-val" style="color: var(--accent-green);">+30,000 ₴</span>
+                        <span class="stat-val" id="b-total-income" style="color: var(--accent-green);">+0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
                         <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-green)" stroke-dasharray="100, 100" />
+                        <circle class="meter" id="donut-income" cx="18" cy="18" r="15.9155" stroke="var(--accent-green)" stroke-dasharray="100, 100" />
                     </svg>
                 </div>
             </div>
@@ -896,11 +835,11 @@
                 <div class="donut-container">
                     <div class="donut-stats">
                         <span class="stat-label">ВИТРАЧЕНО</span>
-                        <span class="stat-val" style="color: var(--accent-red);">-12,000 ₴</span>
+                        <span class="stat-val" id="b-total-expense" style="color: var(--accent-red);">-0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
                         <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-red)" stroke-dasharray="40, 100" />
+                        <circle class="meter" id="donut-expense" cx="18" cy="18" r="15.9155" stroke="var(--accent-red)" stroke-dasharray="0, 100" />
                     </svg>
                 </div>
             </div>
@@ -910,23 +849,23 @@
                 <div class="donut-container">
                     <div class="donut-stats">
                         <span class="stat-label">ЗАОЩАДЖЕНО</span>
-                        <span class="stat-val" style="color: var(--accent-purple);">5,500 ₴</span>
+                        <span class="stat-val" id="b-total-saved" style="color: var(--accent-purple);">0 ₴</span>
                     </div>
                     <svg class="donut" viewBox="0 0 36 36">
                         <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" cx="18" cy="18" r="15.9155" stroke="var(--accent-purple)" stroke-dasharray="18, 100" />
+                        <circle class="meter" id="donut-saved" cx="18" cy="18" r="15.9155" stroke="var(--accent-purple)" stroke-dasharray="0, 100" />
                     </svg>
                 </div>
             </div>
         </div>
 
-        <!-- 2. Таблиця транзакцій[cite: 3] -->
+        <!-- Transactions Table Card -->
         <div class="card table-card">
             <div class="table-header">
                 <div class="widget-title" style="margin: 0;">Реєстр операцій</div>
-                <span style="font-size: 0.75rem; color: var(--text-secondary);">Всього записів: 4</span>
+                <span id="b-records-count" style="font-size: 0.75rem; color: var(--text-secondary);">Всього записів: 0</span>
             </div>
-            <table>
+            <table class="budget-table">
                 <thead>
                     <tr>
                         <th>Дата</th>
@@ -936,40 +875,11 @@
                         <th style="text-align: right;">Сума</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td>26 Серпня</td>
-                        <td>Аванс / Основний дохід</td>
-                        <td>Робота</td>
-                        <td><span class="tag tag-income">Прибуток</span></td>
-                        <td style="text-align: right; font-weight: 700; color: var(--accent-green);">+30,000 ₴</td>
-                    </tr>
-                    <tr>
-                        <td>25 Серпня</td>
-                        <td>Продукти (Сільпо)</td>
-                        <td>Харчування</td>
-                        <td><span class="tag tag-expense">Убиток</span></td>
-                        <td style="text-align: right; font-weight: 700; color: var(--accent-red);">-6,000 ₴</td>
-                    </tr>
-                    <tr>
-                        <td>24 Серпня</td>
-                        <td>Поповнення накопичувального банку</td>
-                        <td>Спільний фонд</td>
-                        <td><span class="tag tag-saved">Відклав</span></td>
-                        <td style="text-align: right; font-weight: 700; color: var(--accent-purple);">-5,500 ₴</td>
-                    </tr>
-                    <tr>
-                        <td>22 Серпня</td>
-                        <td>Кав’ярні та розваги</td>
-                        <td>Відпочинок</td>
-                        <td><span class="tag tag-expense">Убиток</span></td>
-                        <td style="text-align: right; font-weight: 700; color: var(--accent-red);">-6,000 ₴</td>
-                    </tr>
-                </tbody>
+                <tbody id="budget-tbody"></tbody>
             </table>
         </div>
 
-        <!-- 3. Додатковий блок ТОП-Категорій[cite: 3] -->
+        <!-- Bottom Category Analytics -->
         <div class="bottom-widgets">
             <div class="card">
                 <div class="widget-title">Аналітика за категоріями (Кільцевий розподіл)</div>
@@ -998,12 +908,12 @@
                 <div class="widget-title">Швидкі підсумки</div>
                 <div class="category-list">
                     <div class="cat-row">
-                        <span>Серпень Дохід</span>
-                        <span style="color: var(--accent-green);">+30,000 ₴</span>
+                        <span>Місячний Дохід</span>
+                        <span id="b-summary-income" style="color: var(--accent-green);">+0 ₴</span>
                     </div>
                     <div class="cat-row">
                         <span>Всього витрачено</span>
-                        <span style="color: var(--accent-red);">-17,500 ₴</span>
+                        <span id="b-summary-expense" style="color: var(--accent-red);">-0 ₴</span>
                     </div>
                 </div>
             </div>
@@ -1026,27 +936,6 @@
 </div>
 
 <script>
-    /* TAB SWITCHING SYSTEM */
-    function switchTab(tabName) {
-        const habitsTab = document.getElementById('tab-habits');
-        const budgetTab = document.getElementById('tab-budget');
-        const habitsNavBtns = document.querySelectorAll('.btn-tab-habits');
-        const budgetNavBtns = document.querySelectorAll('.btn-tab-budget');
-
-        if (tabName === 'habits') {
-            habitsTab.classList.add('active');
-            budgetTab.classList.remove('active');
-            habitsNavBtns.forEach(btn => btn.classList.add('btn-primary'));
-            budgetNavBtns.forEach(btn => btn.classList.remove('btn-primary'));
-        } else if (tabName === 'budget') {
-            budgetTab.classList.add('active');
-            habitsTab.classList.remove('active');
-            budgetNavBtns.forEach(btn => btn.classList.add('btn-primary'));
-            habitsNavBtns.forEach(btn => btn.classList.remove('btn-primary'));
-        }
-    }
-
-    /* HABIT TRACKER SCRIPT LOGIC */
     const defaultHabits = [
         "Wake up at 06:00 ⏰",
         "Meditation 🧘",
@@ -1062,6 +951,13 @@
         "Sleep before 23:00 🌙"
     ];
 
+    const defaultTransactions = [
+        { date: "26 Серпня", desc: "Аванс / Основний дохід", cat: "Робота", type: "income", amount: 30000 },
+        { date: "25 Серпня", desc: "Продукти (Сільпо)", cat: "Харчування", type: "expense", amount: 6000 },
+        { date: "24 Серпня", desc: "Поповнення накопичувального банку", cat: "Спільний фонд", type: "saved", amount: 5500 },
+        { date: "22 Серпня", desc: "Кав’ярні та розваги", cat: "Відпочинок", type: "expense", amount: 6000 }
+    ];
+
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -1072,7 +968,9 @@
         : todayDateObj.getMonth();
 
     let daysTotal = 31;
+    let activeTab = 'habits';
 
+    // Sync ID Handling
     const urlParams = new URLSearchParams(window.location.search);
     let syncUserId = urlParams.get('syncId') || localStorage.getItem('habitTracker_syncId') || 'user-' + Math.random().toString(36).substr(2, 6);
     syncUserId = syncUserId.trim().replace(/[.#$\[\]/]/g, '');
@@ -1083,13 +981,15 @@
         checks: {},
         mood: [],
         motivation: [],
-        savedTimerMins: 25
+        savedTimerMins: 25,
+        budget: []
     };
 
     let dailyChart, weeklyChart, overallChart, mentalChart;
     let firebaseUnsubscribe = null;
     let isRemoteUpdate = false;
 
+    // Timer Variables
     let timerDuration = 25 * 60;
     let timerTimeLeft = timerDuration;
     let timerInterval = null;
@@ -1099,7 +999,39 @@
         setupDateControls();
         loadLocalData();
         setupFirebaseSync();
+        renderBudget();
     });
+
+    /* --- View Switching --- */
+    function switchTab(tab) {
+        activeTab = tab;
+        const habitsView = document.getElementById('habits-tab-view');
+        const budgetView = document.getElementById('budget-tab-view');
+        const habitsBtn = document.getElementById('nav-habits-btn');
+        const budgetBtn = document.getElementById('nav-budget-btn');
+        const addHabitBtn = document.getElementById('add-habit-btn');
+        const addRecordBtn = document.getElementById('add-record-btn');
+        const appTitle = document.getElementById('app-title');
+
+        if (tab === 'habits') {
+            habitsView.style.display = 'flex';
+            budgetView.style.display = 'none';
+            habitsBtn.className = 'btn btn-primary';
+            budgetBtn.className = 'btn';
+            addHabitBtn.style.display = 'inline-block';
+            addRecordBtn.style.display = 'none';
+            appTitle.innerText = 'HABIT TRACKER';
+        } else {
+            habitsView.style.display = 'none';
+            budgetView.style.display = 'flex';
+            habitsBtn.className = 'btn';
+            budgetBtn.className = 'btn btn-primary';
+            addHabitBtn.style.display = 'none';
+            addRecordBtn.style.display = 'inline-block';
+            appTitle.innerText = 'FINANCIAL TRACKER';
+            renderBudget();
+        }
+    }
 
     function setupDateControls() {
         const yearSelect = document.getElementById('year-select');
@@ -1143,6 +1075,7 @@
     function normalizeState() {
         if (!Array.isArray(state.habits)) state.habits = [...defaultHabits];
         if (!state.checks || typeof state.checks !== 'object') state.checks = {};
+        if (!Array.isArray(state.budget)) state.budget = [...defaultTransactions];
         
         state.habits.forEach((_, idx) => {
             if (!Array.isArray(state.checks[idx]) || state.checks[idx].length !== daysTotal) {
@@ -1179,12 +1112,112 @@
         renderMobileHabits();
         if (!dailyChart) initCharts();
         updateAll();
+        renderBudget();
     }
 
     function saveLocalData() {
         localStorage.setItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`, JSON.stringify(state));
     }
 
+    /* --- Budget Functionality --- */
+    function renderBudget() {
+        const tbody = document.getElementById('budget-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        let totalIncome = 0;
+        let totalExpense = 0;
+        let totalSaved = 0;
+
+        state.budget.forEach((item, index) => {
+            const tr = document.createElement('tr');
+
+            let tagClass = 'tag-income';
+            let tagText = 'Прибуток';
+            let amountPrefix = '+';
+            let amountColor = 'var(--accent-green)';
+
+            if (item.type === 'expense') {
+                tagClass = 'tag-expense';
+                tagText = 'Убиток';
+                amountPrefix = '-';
+                amountColor = 'var(--accent-red)';
+                totalExpense += item.amount;
+            } else if (item.type === 'saved') {
+                tagClass = 'tag-saved';
+                tagText = 'Відклав';
+                amountPrefix = '-';
+                amountColor = 'var(--accent-purple)';
+                totalSaved += item.amount;
+            } else {
+                totalIncome += item.amount;
+            }
+
+            tr.innerHTML = `
+                <td>${item.date}</td>
+                <td>${item.desc}</td>
+                <td>${item.cat}</td>
+                <td><span class="tag ${tagClass}">${tagText}</span></td>
+                <td style="text-align: right; font-weight: 700; color: ${amountColor};">
+                    ${amountPrefix}${item.amount.toLocaleString()} ₴
+                    <span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const totalBalance = totalIncome - totalExpense - totalSaved;
+
+        document.getElementById('b-total-balance').innerText = `${totalBalance.toLocaleString()} ₴`;
+        document.getElementById('b-total-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
+        document.getElementById('b-total-expense').innerText = `-${totalExpense.toLocaleString()} ₴`;
+        document.getElementById('b-total-saved').innerText = `${totalSaved.toLocaleString()} ₴`;
+        document.getElementById('b-records-count').innerText = `Всього записів: ${state.budget.length}`;
+
+        document.getElementById('b-summary-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
+        document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
+
+        // Update Donut Charts SVG Progress
+        const balancePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalBalance / totalIncome) * 100))) : 0;
+        const expensePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalExpense / totalIncome) * 100))) : 0;
+        const savedPct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalSaved / totalIncome) * 100))) : 0;
+
+        document.getElementById('donut-balance').setAttribute('stroke-dasharray', `${balancePct}, 100`);
+        document.getElementById('donut-income').setAttribute('stroke-dasharray', `100, 100`);
+        document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
+        document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
+    }
+
+    function addTransactionPrompt() {
+        const desc = prompt("Введіть опис / джерело:");
+        if (!desc) return;
+        const cat = prompt("Введіть категорію (напр. Робота, Харчування, Відпочинок):", "Загальне");
+        const typeStr = prompt("Тип: 1 - Прибуток, 2 - Убиток, 3 - Відклав", "1");
+        const amountStr = prompt("Сума (₴):", "1000");
+
+        let type = 'income';
+        if (typeStr === '2') type = 'expense';
+        if (typeStr === '3') type = 'saved';
+
+        const amount = parseFloat(amountStr) || 0;
+        const dateNow = new Date().getDate() + " Серпня";
+
+        state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: cat.trim(), type, amount });
+        saveLocalData();
+        pushFullStateToFirebase();
+        renderBudget();
+    }
+
+    function deleteTransaction(index) {
+        if (confirm("Видалити цей запис з бюджету?")) {
+            state.budget.splice(index, 1);
+            saveLocalData();
+            pushFullStateToFirebase();
+            renderBudget();
+        }
+    }
+
+    /* --- Firebase Sync --- */
     function setSyncStatus(text, color = '#aaa') {
         const el = document.getElementById('sync-status');
         if (el) { el.innerText = text; el.style.color = color; }
@@ -1215,6 +1248,7 @@
                         renderTable();
                         renderMobileHabits();
                         updateAll();
+                        renderBudget();
                         setSyncStatus('☁ Synced', '#67c23a');
                     } finally {
                         isRemoteUpdate = false;
@@ -1245,6 +1279,7 @@
         window.dbUpdate(window.dbRef(window.db), updates);
     }
 
+    /* --- Sync Modal --- */
     function openSyncModal() {
         const modal = document.getElementById('sync-modal');
         const input = document.getElementById('sync-id-input');
@@ -1272,6 +1307,7 @@
         }
     }
 
+    /* --- Rendering Logic --- */
     function getTodayIndex() {
         const now = new Date();
         if (now.getFullYear() === currentYear && now.getMonth() === currentMonth) {
@@ -1365,14 +1401,8 @@
             const goalTd = document.createElement('td'); goalTd.id = `goal-${hIdx}`;
             const achievTd = document.createElement('td'); achievTd.id = `achiev-${hIdx}`;
             const leftTd = document.createElement('td'); leftTd.id = `left-${hIdx}`;
-            
             const progressTd = document.createElement('td');
-            progressTd.innerHTML = `
-                <svg class="progress-ring" viewBox="0 0 36 36">
-                    <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path class="ring-meter" id="pring-${hIdx}" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                </svg>`;
-
+            progressTd.innerHTML = `<div class="progress-bar-outer"><div class="progress-bar-inner" id="pbar-${hIdx}"></div></div>`;
             const pctTd = document.createElement('td'); pctTd.id = `pct-${hIdx}`;
             pctTd.style.fontWeight = '700';
 
@@ -1505,6 +1535,7 @@
         });
     }
 
+    /* Timer Logic */
     function setPresetTime(minutes) {
         document.getElementById('timer-custom-input').value = minutes;
         applyNewTime(minutes);
@@ -1604,11 +1635,7 @@
                 document.getElementById(`achiev-${hIdx}`).innerText = completed;
                 document.getElementById(`left-${hIdx}`).innerText = left;
                 document.getElementById(`pct-${hIdx}`).innerText = `${pct}%`;
-                
-                const ringMeter = document.getElementById(`pring-${hIdx}`);
-                if (ringMeter) {
-                    ringMeter.setAttribute('stroke-dasharray', `${pct}, 100`);
-                }
+                document.getElementById(`pbar-${hIdx}`).style.width = `${pct}%`;
             }
 
             checks.forEach((chk, dIdx) => {
