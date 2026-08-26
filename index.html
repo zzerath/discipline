@@ -369,20 +369,27 @@
             line-height: 1;
         }
 
-        .progress-bar-outer {
-            width: 50px;
-            height: 7px;
-            background: #333333;
-            border-radius: 4px;
-            overflow: hidden;
+        /* SVG Circular Progress Meter (Ring Donut) */
+        .progress-ring {
+            width: 22px;
+            height: 22px;
+            transform: rotate(-90deg);
+            display: block;
             margin: 0 auto;
         }
 
-        .progress-bar-inner {
-            height: 100%;
-            background: #ffffff;
-            width: 0%;
-            transition: width 0.3s;
+        .ring-bg {
+            fill: none;
+            stroke: #333333;
+            stroke-width: 4;
+        }
+
+        .ring-meter {
+            fill: none;
+            stroke: #ffffff;
+            stroke-width: 4;
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.3s ease;
         }
 
         /* Mobile Specific Habit List Layout */
@@ -921,7 +928,7 @@
         if (now.getFullYear() === currentYear && now.getMonth() === currentMonth) {
             return now.getDate() - 1;
         }
-        return -1; // Not current active month
+        return -1;
     }
 
     function renderHeaderRow() {
@@ -1009,8 +1016,15 @@
             const goalTd = document.createElement('td'); goalTd.id = `goal-${hIdx}`;
             const achievTd = document.createElement('td'); achievTd.id = `achiev-${hIdx}`;
             const leftTd = document.createElement('td'); leftTd.id = `left-${hIdx}`;
+            
+            // SVG Circular Ring Progress (замість прямокутної полоски)
             const progressTd = document.createElement('td');
-            progressTd.innerHTML = `<div class="progress-bar-outer"><div class="progress-bar-inner" id="pbar-${hIdx}"></div></div>`;
+            progressTd.innerHTML = `
+                <svg class="progress-ring" viewBox="0 0 36 36">
+                    <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="ring-meter" id="pring-${hIdx}" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>[cite: 2]`;
+
             const pctTd = document.createElement('td'); pctTd.id = `pct-${hIdx}`;
             pctTd.style.fontWeight = '700';
 
@@ -1030,7 +1044,7 @@
         mobileContainer.innerHTML = '';
 
         const todayIdx = getTodayIndex();
-        const targetDay = todayIdx !== -1 ? todayIdx : 0; // Fallback to 1st of month if viewing another month
+        const targetDay = todayIdx !== -1 ? todayIdx : 0;
 
         state.habits.forEach((habit, hIdx) => {
             const card = document.createElement('div');
@@ -1052,7 +1066,6 @@
             mobileContainer.appendChild(card);
         });
 
-        // Mobile Mental Inputs Setup
         const mobileMood = document.getElementById('mobile-mood-input');
         const mobileMot = document.getElementById('mobile-motivation-input');
 
@@ -1245,7 +1258,12 @@
                 document.getElementById(`achiev-${hIdx}`).innerText = completed;
                 document.getElementById(`left-${hIdx}`).innerText = left;
                 document.getElementById(`pct-${hIdx}`).innerText = `${pct}%`;
-                document.getElementById(`pbar-${hIdx}`).style.width = `${pct}%`;
+                
+                // Оновлення кольцевого SVG індикатора (Donut ring)
+                const ringMeter = document.getElementById(`pring-${hIdx}`);
+                if (ringMeter) {
+                    ringMeter.setAttribute('stroke-dasharray', `${pct}, 100`);
+                }
             }
 
             checks.forEach((chk, dIdx) => {
