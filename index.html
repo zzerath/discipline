@@ -13,7 +13,7 @@
     <!-- QRCode Generator CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <!-- Firebase SDK (Modular App & Realtime Database) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -155,7 +155,7 @@
         .analytics-toggle-btn {
             display: none;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
 
         /* Top Analytics & Timer Section Grid */
@@ -277,7 +277,7 @@
             color: #ffffff;
         }
 
-        /* Table Styling */
+        /* Desktop Table Styling */
         .table-container {
             overflow-x: auto;
             background: var(--card-bg);
@@ -322,14 +322,8 @@
             min-width: 24px;
         }
 
-        .is-weekend {
-            background-color: var(--weekend-bg);
-        }
-
-        .is-today {
-            background-color: var(--today-bg) !important;
-            font-weight: bold;
-        }
+        .is-weekend { background-color: var(--weekend-bg); }
+        .is-today { background-color: var(--today-bg) !important; font-weight: bold; }
 
         .week-header {
             background: #000000;
@@ -340,23 +334,18 @@
             border-bottom: 1px solid var(--card-border);
         }
 
-        .sub-header {
-            font-size: 9px;
-            color: var(--text-muted);
-        }
+        .sub-header { font-size: 9px; color: var(--text-muted); }
 
-        tr:nth-child(even) {
-            background-color: var(--row-alt);
-        }
+        tr:nth-child(even) { background-color: var(--row-alt); }
 
-        /* Checkbox Custom Styling */
+        /* Custom Checkbox Styling */
         input[type="checkbox"] {
             appearance: none;
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 18px;
+            height: 18px;
             border: 1px solid #ffffff;
-            border-radius: 3px;
+            border-radius: 4px;
             background-color: transparent;
             cursor: pointer;
             display: inline-flex;
@@ -374,7 +363,7 @@
 
         input[type="checkbox"]:checked::after {
             content: '✓';
-            font-size: 10px;
+            font-size: 12px;
             font-weight: 900;
             color: #121212;
             line-height: 1;
@@ -394,6 +383,29 @@
             background: #ffffff;
             width: 0%;
             transition: width 0.3s;
+        }
+
+        /* Mobile Specific Habit List Layout */
+        .mobile-habits-container {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mobile-habit-card {
+            background: var(--row-alt);
+            border: 1px solid var(--card-border);
+            padding: 12px 16px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-habit-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
         }
 
         /* Bottom Grid: Mental State & Top Habits */
@@ -433,6 +445,29 @@
             outline: none;
         }
 
+        .mobile-mental-inputs {
+            display: none;
+            gap: 15px;
+            justify-content: space-around;
+            padding: 10px;
+            background: var(--row-alt);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .mobile-mental-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .mobile-mental-item input {
+            width: 50px;
+            text-align: center;
+        }
+
         .top-habits-list {
             list-style: none;
             display: flex;
@@ -457,7 +492,7 @@
             font-weight: bold;
         }
 
-        /* Modal Box for QR Sync */
+        /* Modal Box for Sync */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -489,67 +524,57 @@
             display: inline-block;
         }
 
-        /* Media Queries for Mobile Responsiveness */
+        /* Mobile Layout Switch (<900px) */
         @media (max-width: 900px) {
-            body { padding: 10px; }
-            .dashboard-container { padding: 12px; }
+            body { padding: 8px; }
+            .dashboard-container { padding: 12px; gap: 15px; }
             .analytics-grid { display: flex; flex-direction: column; }
             .bottom-grid { display: flex; flex-direction: column; }
             .analytics-toggle-btn { display: block; }
             .analytics-collapsible { display: none; }
             .analytics-collapsible.show { display: flex; flex-direction: column; gap: 15px; }
 
-            /* On Mobile: Hide all days except Today */
-            .day-header-col:not(.is-today),
-            .day-cell-col:not(.is-today),
-            .mental-cell-col:not(.is-today) {
-                display: none !important;
-            }
+            /* Hide Desktop Table on Mobile */
+            .table-container { display: none; }
 
-            /* Hide weeks header row on mobile to fit nicely */
-            #weeks-header-row {
-                display: none !important;
-            }
+            /* Show Mobile Clean Habit List */
+            .mobile-habits-container { display: flex; }
 
-            th.habit-title-col {
-                rowspan: 1 !important;
-            }
+            /* Mental State Mobile view */
+            .mental-inputs-table { display: none; }
+            .mobile-mental-inputs { display: flex; }
         }
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
-    <!-- Top Bar Navigation -->
+    <!-- Top Navigation -->
     <div class="top-navbar">
         <div>
             <h1>HABIT TRACKER</h1>
-            <span id="current-month-display" style="font-size: 11px; opacity: 0.7; font-weight: 500;">- DYNAMIC MONTH -</span>
+            <span id="current-month-display" style="font-size: 11px; opacity: 0.7; font-weight: 500;">- MONTH -</span>
         </div>
         <div class="controls-group">
             <span id="sync-status" class="sync-badge">☁ Ready</span>
             <select id="year-select" onchange="changeCalendarMonth()"></select>
             <select id="month-select" onchange="changeCalendarMonth()"></select>
             <button class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
-            <button class="btn" onclick="openSyncModal()">⚡ Sync ID</button>
+            <button class="btn" onclick="openSyncModal()">⚡ Sync</button>
             <button class="btn" onclick="resetMonthData()">Reset</button>
         </div>
     </div>
 
-    <!-- Toggle Analytics Button for Mobile -->
-    <button class="btn analytics-toggle-btn" onclick="toggleAnalytics()">📊 Show / Hide Analytics</button>
+    <!-- Analytics Toggle for Mobile -->
+    <button class="btn analytics-toggle-btn" onclick="toggleAnalytics()">📊 Analytics / Timer</button>
 
-    <!-- Top Analytics & Timer Grid -->
+    <!-- Analytics & Timer Grid -->
     <div class="analytics-grid analytics-collapsible" id="analytics-section">
-        <!-- Daily Progress -->
         <div class="card">
             <div class="card-header">Daily Progress</div>
-            <div class="chart-box">
-                <canvas id="dailyChart"></canvas>
-            </div>
+            <div class="chart-box"><canvas id="dailyChart"></canvas></div>
         </div>
 
-        <!-- Focus Timer Card -->
         <div class="card timer-card">
             <div class="card-header" style="width: 100%;">Focus Timer</div>
             <select id="timer-habit-select" class="timer-select"></select>
@@ -571,61 +596,46 @@
             </div>
         </div>
 
-        <!-- Weekly Progress -->
         <div class="card">
             <div class="card-header">Weekly Progress</div>
-            <div class="chart-box">
-                <canvas id="weeklyChart"></canvas>
-            </div>
+            <div class="chart-box"><canvas id="weeklyChart"></canvas></div>
         </div>
 
-        <!-- Overall Stats -->
         <div class="card">
             <div class="card-header">Overall Stats</div>
             <div class="overall-stats-content">
                 <div class="stats-numbers">
-                    <div class="stat-item">
-                        <span class="stat-label">Goal</span>
-                        <span class="stat-value" id="stat-goal">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Achieved</span>
-                        <span class="stat-value" id="stat-completed">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Left</span>
-                        <span class="stat-value" id="stat-left">0</span>
-                    </div>
+                    <div class="stat-item"><span class="stat-label">Goal</span><span class="stat-value" id="stat-goal">0</span></div>
+                    <div class="stat-item"><span class="stat-label">Achieved</span><span class="stat-value" id="stat-completed">0</span></div>
+                    <div class="stat-item"><span class="stat-label">Left</span><span class="stat-value" id="stat-left">0</span></div>
                 </div>
-                <div style="width: 80px; height: 80px;">
-                    <canvas id="overallChart"></canvas>
-                </div>
+                <div style="width: 80px; height: 80px;"><canvas id="overallChart"></canvas></div>
             </div>
         </div>
     </div>
 
-    <!-- Main Table Section -->
+    <!-- Desktop Table View -->
     <div class="table-container">
         <table id="habits-table">
             <thead>
-                <tr id="weeks-header-row">
-                    <th rowspan="2" class="habit-title-col">My Habits</th>
-                    <!-- Dynamic Week Headers -->
-                </tr>
-                <tr id="days-header-row">
-                    <!-- Dynamic Days Headers -->
-                </tr>
+                <tr id="weeks-header-row"><th rowspan="2" class="habit-title-col">My Habits</th></tr>
+                <tr id="days-header-row"></tr>
             </thead>
-            <tbody id="habits-tbody">
-                <!-- JS generates habit rows -->
-            </tbody>
+            <tbody id="habits-tbody"></tbody>
         </table>
     </div>
 
-    <!-- Bottom Section: Mental State & Leaderboard -->
+    <!-- Mobile Clean Habit List View -->
+    <div class="mobile-habits-container" id="mobile-habits-list">
+        <!-- Generated dynamically for Today -->
+    </div>
+
+    <!-- Bottom Section: Mental State & Top Habits -->
     <div class="bottom-grid">
         <div class="card mental-state-card">
             <div class="card-header" style="text-align: left;">Mental State (Mood & Motivation)</div>
+            
+            <!-- Desktop Table view for Mental State -->
             <div style="overflow-x: auto;">
                 <table class="mental-inputs-table">
                     <tr id="mood-row">
@@ -636,6 +646,19 @@
                     </tr>
                 </table>
             </div>
+
+            <!-- Mobile Mental State Inputs (Today Only) -->
+            <div class="mobile-mental-inputs">
+                <div class="mobile-mental-item">
+                    <span>Mood (Today):</span>
+                    <input type="number" id="mobile-mood-input" min="1" max="10">
+                </div>
+                <div class="mobile-mental-item">
+                    <span>Motivation (Today):</span>
+                    <input type="number" id="mobile-motivation-input" min="1" max="10">
+                </div>
+            </div>
+
             <div class="chart-box" style="height: 120px;">
                 <canvas id="mentalChart"></canvas>
             </div>
@@ -648,7 +671,7 @@
     </div>
 </div>
 
-<!-- Modal Dialog for Syncing & QR Code -->
+<!-- Modal Sync Dialog -->
 <div class="modal-overlay" id="sync-modal">
     <div class="modal-box">
         <h3 style="font-size: 16px;">Device Synchronization</h3>
@@ -681,7 +704,6 @@
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // Restore saved month/year or fallback to current real date
     const todayDateObj = new Date();
     let currentYear = parseInt(localStorage.getItem('habitTracker_lastYear')) || todayDateObj.getFullYear();
     let currentMonth = localStorage.getItem('habitTracker_lastMonth') !== null 
@@ -690,7 +712,7 @@
 
     let daysTotal = 31;
 
-    // Sync ID handling (URL param > LocalStorage > Random fallback)
+    // Sync ID Handling
     const urlParams = new URLSearchParams(window.location.search);
     let syncUserId = urlParams.get('syncId') || localStorage.getItem('habitTracker_syncId') || 'user-' + Math.random().toString(36).substr(2, 6);
     syncUserId = syncUserId.trim().replace(/[.#$\[\]/]/g, '');
@@ -746,7 +768,6 @@
         currentYear = parseInt(document.getElementById('year-select').value);
         currentMonth = parseInt(document.getElementById('month-select').value);
 
-        // Save selected month and year to LocalStorage
         localStorage.setItem('habitTracker_lastYear', currentYear);
         localStorage.setItem('habitTracker_lastMonth', currentMonth);
 
@@ -783,11 +804,7 @@
         calculateDaysInMonth();
         const saved = localStorage.getItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`);
         if (saved) {
-            try {
-                state = JSON.parse(saved);
-            } catch (e) {
-                state = {};
-            }
+            try { state = JSON.parse(saved); } catch (e) { state = {}; }
         }
         normalizeState();
 
@@ -800,6 +817,7 @@
 
         renderHeaderRow();
         renderTable();
+        renderMobileHabits();
         if (!dailyChart) initCharts();
         updateAll();
     }
@@ -808,25 +826,17 @@
         localStorage.setItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`, JSON.stringify(state));
     }
 
-    /* --- Firebase Granular Sync Operations --- */
-
+    /* --- Firebase Sync --- */
     function setSyncStatus(text, color = '#aaa') {
         const el = document.getElementById('sync-status');
-        if (el) {
-            el.innerText = text;
-            el.style.color = color;
-        }
+        if (el) { el.innerText = text; el.style.color = color; }
     }
 
     function setupFirebaseSync() {
         const checkFirebase = setInterval(() => {
             if (window.db && window.dbRef && window.dbOnValue) {
                 clearInterval(checkFirebase);
-                
-                if (firebaseUnsubscribe) {
-                    firebaseUnsubscribe();
-                    firebaseUnsubscribe = null;
-                }
+                if (firebaseUnsubscribe) { firebaseUnsubscribe(); firebaseUnsubscribe = null; }
 
                 setSyncStatus('☁ Connecting...', '#e6a23c');
                 const userRef = window.dbRef(window.db, `users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}`);
@@ -845,6 +855,7 @@
                         saveLocalData();
 
                         renderTable();
+                        renderMobileHabits();
                         updateAll();
                         setSyncStatus('☁ Synced', '#67c23a');
                     } finally {
@@ -861,10 +872,8 @@
     function updateRemoteField(path, value) {
         if (!window.db || !window.dbUpdate || !window.dbRef) return;
         setSyncStatus('☁ Saving...', '#e6a23c');
-
         const updates = {};
         updates[`users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}/${path}`] = value;
-
         window.dbUpdate(window.dbRef(window.db), updates)
             .then(() => setSyncStatus('☁ Synced', '#67c23a'))
             .catch(() => setSyncStatus('⚠ Error', '#f56c6c'));
@@ -878,8 +887,7 @@
         window.dbUpdate(window.dbRef(window.db), updates);
     }
 
-    /* --- Sync & QR Modal logic --- */
-
+    /* --- Sync QR Modal --- */
     function openSyncModal() {
         const modal = document.getElementById('sync-modal');
         const input = document.getElementById('sync-id-input');
@@ -891,18 +899,11 @@
         const cleanUrl = window.location.href.split('?')[0];
         const fullSyncUrl = `${cleanUrl}?syncId=${encodeURIComponent(syncUserId)}`;
 
-        new QRCode(qrBox, {
-            text: fullSyncUrl,
-            width: 140,
-            height: 140
-        });
-
+        new QRCode(qrBox, { text: fullSyncUrl, width: 140, height: 140 });
         modal.style.display = 'flex';
     }
 
-    function closeSyncModal() {
-        document.getElementById('sync-modal').style.display = 'none';
-    }
+    function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
 
     function applySyncId() {
         const input = document.getElementById('sync-id-input');
@@ -915,10 +916,12 @@
     }
 
     /* --- Rendering Logic --- */
-
-    function isToday(dayNum) {
+    function getTodayIndex() {
         const now = new Date();
-        return now.getFullYear() === currentYear && now.getMonth() === currentMonth && now.getDate() === dayNum;
+        if (now.getFullYear() === currentYear && now.getMonth() === currentMonth) {
+            return now.getDate() - 1;
+        }
+        return -1; // Not current active month
     }
 
     function renderHeaderRow() {
@@ -944,13 +947,13 @@
             if (dayInWeek === 7) dayInWeek = 0;
 
             const date = new Date(currentYear, currentMonth, i);
-            const dayIndex = (date.getDay() + 6) % 7; // Monday-first
+            const dayIndex = (date.getDay() + 6) % 7;
             const dayName = daysOfWeek[dayIndex];
             const isWeekend = (dayName === "Sa" || dayName === "Su");
-            const todayFlag = isToday(i);
+            const todayFlag = (getTodayIndex() === i - 1);
 
             const th = document.createElement('th');
-            th.className = `day-header day-header-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
+            th.className = `day-header ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             th.innerHTML = `<span class="sub-header">${dayName}</span><br>${i}`;
             daysRow.appendChild(th);
         }
@@ -988,22 +991,16 @@
                 const date = new Date(currentYear, currentMonth, d + 1);
                 const dayName = daysOfWeek[(date.getDay() + 6) % 7];
                 const isWeekend = (dayName === "Sa" || dayName === "Su");
-                const todayFlag = isToday(d + 1);
+                const todayFlag = (getTodayIndex() === d);
 
                 const td = document.createElement('td');
-                td.className = `day-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
+                td.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = Boolean(state.checks[hIdx][d]);
                 checkbox.addEventListener('change', (e) => {
-                    const checkedVal = e.target.checked;
-                    state.checks[hIdx][d] = checkedVal;
-                    saveLocalData();
-                    if (!isRemoteUpdate) {
-                        updateRemoteField(`checks/${hIdx}/${d}`, checkedVal);
-                    }
-                    updateAll();
+                    toggleHabitCheck(hIdx, d, e.target.checked);
                 });
                 td.appendChild(checkbox);
                 tr.appendChild(td);
@@ -1027,6 +1024,72 @@
         populateTimerHabits();
     }
 
+    /* Clean Mobile Habit List rendering (Today Only) */
+    function renderMobileHabits() {
+        const mobileContainer = document.getElementById('mobile-habits-list');
+        mobileContainer.innerHTML = '';
+
+        const todayIdx = getTodayIndex();
+        const targetDay = todayIdx !== -1 ? todayIdx : 0; // Fallback to 1st of month if viewing another month
+
+        state.habits.forEach((habit, hIdx) => {
+            const card = document.createElement('div');
+            card.className = 'mobile-habit-card';
+
+            const title = document.createElement('span');
+            title.className = 'mobile-habit-title';
+            title.innerText = habit;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = Boolean(state.checks[hIdx]?.[targetDay]);
+            checkbox.addEventListener('change', (e) => {
+                toggleHabitCheck(hIdx, targetDay, e.target.checked);
+            });
+
+            card.appendChild(title);
+            card.appendChild(checkbox);
+            mobileContainer.appendChild(card);
+        });
+
+        // Mobile Mental Inputs Setup
+        const mobileMood = document.getElementById('mobile-mood-input');
+        const mobileMot = document.getElementById('mobile-motivation-input');
+
+        mobileMood.value = state.mood[targetDay] !== undefined ? state.mood[targetDay] : 7;
+        mobileMot.value = state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : 7;
+
+        mobileMood.onchange = (e) => {
+            const val = parseInt(e.target.value) || 0;
+            state.mood[targetDay] = val;
+            saveLocalData();
+            if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
+            updateMentalChart();
+        };
+
+        mobileMot.onchange = (e) => {
+            const val = parseInt(e.target.value) || 0;
+            state.motivation[targetDay] = val;
+            saveLocalData();
+            if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
+            updateMentalChart();
+        };
+    }
+
+    function toggleHabitCheck(hIdx, dayIdx, isChecked) {
+        if (!state.checks[hIdx]) state.checks[hIdx] = Array(daysTotal).fill(false);
+        state.checks[hIdx][dayIdx] = isChecked;
+        saveLocalData();
+
+        if (!isRemoteUpdate) {
+            updateRemoteField(`checks/${hIdx}/${dayIdx}`, isChecked);
+        }
+
+        renderTable();
+        renderMobileHabits();
+        updateAll();
+    }
+
     function renderMentalInputs() {
         const moodRow = document.getElementById('mood-row');
         const motivationRow = document.getElementById('motivation-row');
@@ -1038,10 +1101,10 @@
             const date = new Date(currentYear, currentMonth, d + 1);
             const dayName = daysOfWeek[(date.getDay() + 6) % 7];
             const isWeekend = (dayName === "Sa" || dayName === "Su");
-            const todayFlag = isToday(d + 1);
+            const todayFlag = (getTodayIndex() === d);
 
             const mTd = document.createElement('td');
-            mTd.className = `mental-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
+            mTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const mInput = document.createElement('input');
             mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
             mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
@@ -1049,16 +1112,14 @@
                 const val = parseInt(e.target.value) || 0;
                 state.mood[d] = val;
                 saveLocalData();
-                if (!isRemoteUpdate) {
-                    updateRemoteField(`mood/${d}`, val);
-                }
+                if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
                 updateMentalChart();
             });
             mTd.appendChild(mInput);
             moodRow.appendChild(mTd);
 
             const motTd = document.createElement('td');
-            motTd.className = `mental-cell-col ${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
+            motTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const motInput = document.createElement('input');
             motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
             motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
@@ -1066,9 +1127,7 @@
                 const val = parseInt(e.target.value) || 0;
                 state.motivation[d] = val;
                 saveLocalData();
-                if (!isRemoteUpdate) {
-                    updateRemoteField(`motivation/${d}`, val);
-                }
+                if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
                 updateMentalChart();
             });
             motTd.appendChild(motInput);
@@ -1081,8 +1140,7 @@
         select.innerHTML = '<option value="-1">-- Select Habit --</option>';
         state.habits.forEach((h, idx) => {
             const opt = document.createElement('option');
-            opt.value = idx;
-            opt.innerText = h;
+            opt.value = idx; opt.innerText = h;
             select.appendChild(opt);
         });
     }
@@ -1093,9 +1151,7 @@
         applyNewTime(minutes);
     }
 
-    function setCustomTime(minutes) {
-        applyNewTime(minutes);
-    }
+    function setCustomTime(minutes) { applyNewTime(minutes); }
 
     function applyNewTime(minutes) {
         const mins = parseInt(minutes, 10);
@@ -1103,9 +1159,7 @@
             state.savedTimerMins = mins;
             timerDuration = mins * 60;
             saveLocalData();
-            if (!isRemoteUpdate) {
-                updateRemoteField(`savedTimerMins`, mins);
-            }
+            if (!isRemoteUpdate) updateRemoteField(`savedTimerMins`, mins);
             resetTimer();
         }
     }
@@ -1216,33 +1270,17 @@
 
     function initCharts() {
         const ctxDaily = document.getElementById('dailyChart').getContext('2d');
-        const dailyLabels = Array.from({length: daysTotal}, (_, i) => i + 1);
-
         dailyChart = new Chart(ctxDaily, {
             type: 'bar',
-            data: { labels: dailyLabels, datasets: [{ data: [], backgroundColor: '#ffffff', borderRadius: 2 }] },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: '#888888', font: { size: 8 } } },
-                    y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } }, beginAtZero: true }
-                }
-            }
+            data: { labels: Array.from({length: daysTotal}, (_, i) => i + 1), datasets: [{ data: [], backgroundColor: '#ffffff', borderRadius: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888888', font: { size: 8 } } }, y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } }, beginAtZero: true } } }
         });
 
         const ctxWeekly = document.getElementById('weeklyChart').getContext('2d');
         weeklyChart = new Chart(ctxWeekly, {
             type: 'bar',
             data: { labels: ['W1', 'W2', 'W3', 'W4', 'W5'], datasets: [{ data: [], backgroundColor: '#aaaaaa', borderRadius: 3 }] },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 9 } } },
-                    y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888' }, beginAtZero: true }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 9 } } }, y: { grid: { color: '#2d2d2d' }, ticks: { color: '#888888' }, beginAtZero: true } } }
         });
 
         const ctxOverall = document.getElementById('overallChart').getContext('2d');
@@ -1262,14 +1300,7 @@
                     { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2 }
                 ]
             },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } },
-                scales: {
-                    x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } },
-                    y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } }, y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } } } }
         });
     }
 
@@ -1306,6 +1337,7 @@
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
+            renderMobileHabits();
             updateAll();
         }
     }
@@ -1320,6 +1352,7 @@
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
+            renderMobileHabits();
             updateAll();
         }
     }
@@ -1330,6 +1363,7 @@
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
+            renderMobileHabits();
             updateAll();
         }
     }
