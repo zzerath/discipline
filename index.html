@@ -49,6 +49,7 @@
             --accent-red: #ef4444;
             --accent-purple: #a855f7;
             --accent-blue: #3b82f6;
+            --accent-yellow: #eab308;
             --btn-bg: #2a2a2a;
         }
 
@@ -651,11 +652,58 @@
             display: inline-block;
         }
 
+        /* 3rd Tab Specific Styles (Mindset & Recovery) */
+        .mindset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .status-box {
+            background: var(--row-alt);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .tips-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tip-item {
+            background: var(--row-alt);
+            border-left: 3px solid var(--accent-purple);
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .tip-item strong {
+            color: #ffffff;
+            display: block;
+            margin-bottom: 2px;
+        }
+
         /* Responsive Mobile Optimization */
         @media (max-width: 900px) {
             body { padding: 8px; }
             .dashboard-container { padding: 12px; gap: 15px; }
-            .analytics-grid, .bottom-grid, .top-widgets, .bottom-widgets { display: flex; flex-direction: column; }
+            .analytics-grid, .bottom-grid, .top-widgets, .bottom-widgets, .mindset-grid { display: flex; flex-direction: column; }
             .analytics-toggle-btn { display: block; }
             .analytics-collapsible { display: none; }
             .analytics-collapsible.show { display: flex; flex-direction: column; gap: 15px; }
@@ -721,6 +769,7 @@
             <!-- Navigation View Switches -->
             <button id="nav-habits-btn" class="btn btn-primary" onclick="switchTab('habits')">Habits</button>
             <button id="nav-budget-btn" class="btn" onclick="switchTab('budget')">Budget</button>
+            <button id="nav-mindset-btn" class="btn" onclick="switchTab('mindset')">Mindset & Recovery</button>
 
             <!-- Date Selectors -->
             <select id="year-select" onchange="changeCalendarMonth()"></select>
@@ -940,6 +989,49 @@
             </div>
         </div>
     </div>
+
+    <!-- 3. MINDSET & RECOVERY TAB VIEW -->
+    <div id="mindset-tab-view" class="view-section" style="display: none;">
+        <div class="card">
+            <div class="card-header" style="text-align: left;">Аналіз Емоційного Стану та Запобігання Вигоранню</div>
+            <div class="mindset-grid">
+                <div class="status-box">
+                    <div>
+                        <div class="stat-label">Середній настрій</div>
+                        <div class="stat-value" id="avg-mood-val">0 / 10</div>
+                    </div>
+                    <div>
+                        <div class="stat-label">Середня мотивація</div>
+                        <div class="stat-value" id="avg-mot-val">0 / 10</div>
+                    </div>
+                </div>
+
+                <div class="status-box">
+                    <div>
+                        <div class="stat-label">Рівень вигорання</div>
+                        <div style="font-size: 14px; font-weight: 700; margin-top: 2px;" id="burnout-status-text">Визначається...</div>
+                    </div>
+                    <span id="burnout-badge" class="status-badge" style="background: #333; color: #fff;">Оцінка</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mindset-grid">
+            <div class="card">
+                <div class="card-header" style="text-align: left;">Застереження та Сигнали</div>
+                <div id="burnout-warnings" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #ccc;">
+                    <!-- Динамічні застереження -->
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" style="text-align: left;">Поради для відновлення ресурсу</div>
+                <div class="tips-list" id="recovery-tips-list">
+                    <!-- Динамічні поради -->
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Sync Dialog -->
@@ -957,7 +1049,6 @@
 </div>
 
 <script>
-    // Оновлений список практичних і збалансованих щоденних звичок
     const defaultHabits = [
         "Ранній підйом (до 07:00) ⏰",
         "Склянка води зранку 💧",
@@ -1026,29 +1117,43 @@
         activeTab = tab;
         const habitsView = document.getElementById('habits-tab-view');
         const budgetView = document.getElementById('budget-tab-view');
+        const mindsetView = document.getElementById('mindset-tab-view');
+
         const habitsBtn = document.getElementById('nav-habits-btn');
         const budgetBtn = document.getElementById('nav-budget-btn');
+        const mindsetBtn = document.getElementById('nav-mindset-btn');
+
         const addHabitBtn = document.getElementById('add-habit-btn');
         const addRecordBtn = document.getElementById('add-record-btn');
         const appTitle = document.getElementById('app-title');
 
+        habitsView.style.display = 'none';
+        budgetView.style.display = 'none';
+        mindsetView.style.display = 'none';
+
+        habitsBtn.className = 'btn';
+        budgetBtn.className = 'btn';
+        mindsetBtn.className = 'btn';
+
+        addHabitBtn.style.display = 'none';
+        addRecordBtn.style.display = 'none';
+
         if (tab === 'habits') {
             habitsView.style.display = 'flex';
-            budgetView.style.display = 'none';
             habitsBtn.className = 'btn btn-primary';
-            budgetBtn.className = 'btn';
             addHabitBtn.style.display = 'inline-block';
-            addRecordBtn.style.display = 'none';
             appTitle.innerText = 'HABIT TRACKER';
-        } else {
-            habitsView.style.display = 'none';
+        } else if (tab === 'budget') {
             budgetView.style.display = 'flex';
-            habitsBtn.className = 'btn';
             budgetBtn.className = 'btn btn-primary';
-            addHabitBtn.style.display = 'none';
             addRecordBtn.style.display = 'inline-block';
             appTitle.innerText = 'FINANCIAL TRACKER';
             renderBudget();
+        } else if (tab === 'mindset') {
+            mindsetView.style.display = 'flex';
+            mindsetBtn.className = 'btn btn-primary';
+            appTitle.innerText = 'MINDSET & RECOVERY';
+            renderMindsetTab();
         }
     }
 
@@ -1140,6 +1245,71 @@
 
     function saveLocalData() {
         localStorage.setItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`, JSON.stringify(state));
+    }
+
+    /* --- Mindset & Recovery Tab Logic --- */
+    function renderMindsetTab() {
+        const moodArr = state.mood.filter(v => typeof v === 'number' && !isNaN(v));
+        const motArr = state.motivation.filter(v => typeof v === 'number' && !isNaN(v));
+
+        const avgMood = moodArr.length ? (moodArr.reduce((a, b) => a + b, 0) / moodArr.length).toFixed(1) : 0;
+        const avgMot = motArr.length ? (motArr.reduce((a, b) => a + b, 0) / motArr.length).toFixed(1) : 0;
+
+        document.getElementById('avg-mood-val').innerText = `${avgMood} / 10`;
+        document.getElementById('avg-mot-val').innerText = `${avgMot} / 10`;
+
+        const overallMental = (parseFloat(avgMood) + parseFloat(avgMot)) / 2;
+
+        const statusText = document.getElementById('burnout-status-text');
+        const badge = document.getElementById('burnout-badge');
+        const warningsBox = document.getElementById('burnout-warnings');
+        const tipsBox = document.getElementById('recovery-tips-list');
+
+        warningsBox.innerHTML = '';
+        tipsBox.innerHTML = '';
+
+        if (overallMental >= 7.5) {
+            statusText.innerText = 'Стабільний стан (Зелена зона)';
+            statusText.style.color = 'var(--accent-green)';
+            badge.innerText = 'Низький ризик';
+            badge.style.background = 'rgba(34, 197, 94, 0.2)';
+            badge.style.color = 'var(--accent-green)';
+
+            warningsBox.innerHTML = `<p>🚀 Ваші показники в нормі! Ви тримаєте хорошу дисципліну без надмірного стресу. Продовжуйте у тому ж дусі, але не забувайте про регулярні паузи.</p>`;
+            
+            tipsBox.innerHTML = `
+                <div class="tip-item"><strong>Підтримуйте баланс:</strong> Не збільшуйте навантаження різко, навіть якщо відчуваєте приплив сил.</div>
+                <div class="tip-item"><strong>Якісний відпочинок:</strong> Плануйте вечори без екранів та соцмереж для якісного перезавантаження.</div>
+            `;
+        } else if (overallMental >= 5.0) {
+            statusText.innerText = 'Помірний тиск (Жовта зона)';
+            statusText.style.color = 'var(--accent-yellow)';
+            badge.innerText = 'Увага';
+            badge.style.background = 'rgba(234, 179, 8, 0.2)';
+            badge.style.color = 'var(--accent-yellow)';
+
+            warningsBox.innerHTML = `<p>⚠️ Ваша мотивація або настрій почали знижуватися. Це сигналізує про перші ознаки втоми. Якщо ігнорувати це, ви можете вигоріти протягом 1-2 тижнів.</p>`;
+
+            tipsBox.innerHTML = `
+                <div class="tip-item"><strong>Спростіть список звичок:</strong> Залиште лише 3 найважливіші звички на день, інші зробіть опціональними.</div>
+                <div class="tip-item"><strong>Змініть обстановку:</strong> Проведіть більше часу на свіжому повітрі або змініть робоче місце.</div>
+                <div class="tip-item"><strong>Фокус на сні:</strong> Відновіть якісний сон до 23:00 — це основне джерело дофаміну.</div>
+            `;
+        } else {
+            statusText.innerText = 'Високий ризик вигорання (Червона зона)';
+            statusText.style.color = 'var(--accent-red)';
+            badge.innerText = 'Криза';
+            badge.style.background = 'rgba(239, 68, 68, 0.2)';
+            badge.style.color = 'var(--accent-red)';
+
+            warningsBox.innerHTML = `<p>🛑 Вказівка на емоційне виснаження. Самодисципліна через «не можу» зараз принесе більше шкоди, ніж користі. Потрібне негайне перезавантаження.</p>`;
+
+            tipsBox.innerHTML = `
+                <div class="tip-item"><strong>Візьміть паузу:</strong> Дозвольте собі 1-2 дні мінімальної активності без почуття провини.</div>
+                <div class="tip-item"><strong>Цифровий детокс:</strong> Вимкніть сповіщення та мінімізуйте перегляд коротких відео (TikTok, Reels).</div>
+                <div class="tip-item"><strong>Дрібні перемоги:</strong> Робіть супер-прості дії (склянка води, 5 хв розтяжки), щоб повернути відчуття контролю.</div>
+            `;
+        }
     }
 
     /* --- Budget Functionality & Dynamic Category Chart --- */
@@ -1363,6 +1533,7 @@
                         renderMobileHabits();
                         updateAll();
                         renderBudget();
+                        if (activeTab === 'mindset') renderMindsetTab();
                         setSyncStatus('☁ Synced', '#67c23a');
                     } finally {
                         isRemoteUpdate = false;
@@ -1769,6 +1940,7 @@
         updateOverallChart(totalCompleted, totalLeft);
         updateTopHabitsList(habitStats);
         updateMentalChart();
+        if (activeTab === 'mindset') renderMindsetTab();
     }
 
     function initCharts() {
