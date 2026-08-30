@@ -1106,6 +1106,15 @@
     let timerInterval = null;
     let isTimerRunning = false;
 
+    // Допоміжна функція розрахунку середнього значення (фільтрує null, undefined та 0)
+    function calculateAverageMetric(dataArray) {
+        if (!Array.isArray(dataArray)) return 0;
+        const validEntries = dataArray.filter(value => value !== null && value !== undefined && value !== 0 && value !== "");
+        if (validEntries.length === 0) return 0;
+        const sum = validEntries.reduce((acc, curr) => acc + Number(curr), 0);
+        return parseFloat((sum / validEntries.length).toFixed(1));
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
         setupDateControls();
         loadLocalData();
@@ -1212,11 +1221,12 @@
             }
         });
 
+        // Ініціалізація незаповнених днів значенням null замість 0 або 7
         if (!Array.isArray(state.mood) || state.mood.length !== daysTotal) {
-            state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? 7);
+            state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? null);
         }
         if (!Array.isArray(state.motivation) || state.motivation.length !== daysTotal) {
-            state.motivation = Array.from({length: daysTotal}, (_, dIdx) => state.motivation?.[dIdx] ?? 8);
+            state.motivation = Array.from({length: daysTotal}, (_, dIdx) => state.motivation?.[dIdx] ?? null);
         }
     }
 
@@ -1249,16 +1259,21 @@
 
     /* --- Mindset & Recovery Tab Logic --- */
     function renderMindsetTab() {
-        const moodArr = state.mood.filter(v => typeof v === 'number' && !isNaN(v));
-        const motArr = state.motivation.filter(v => typeof v === 'number' && !isNaN(v));
+        const avgMood = calculateAverageMetric(state.mood);
+        const avgMot = calculateAverageMetric(state.motivation);
 
-        const avgMood = moodArr.length ? (moodArr.reduce((a, b) => a + b, 0) / moodArr.length).toFixed(1) : 0;
-        const avgMot = motArr.length ? (motArr.reduce((a, b) => a + b, 0) / motArr.length).toFixed(1) : 0;
+        document.getElementById('avg-mood-val').innerText = avgMood > 0 ? `${avgMood} / 10` : "—";
+        document.getElementById('avg-mot-val').innerText = avgMot > 0 ? `${avgMot} / 10` : "—";
 
-        document.getElementById('avg-mood-val').innerText = `${avgMood} / 10`;
-        document.getElementById('avg-mot-val').innerText = `${avgMot} / 10`;
-
-        const overallMental = (parseFloat(avgMood) + parseFloat(avgMot)) / 2;
+        // Загальна оцінка обчислюється тільки за наявності даних
+        let overallMental = 0;
+        if (avgMood > 0 && avgMot > 0) {
+            overallMental = (avgMood + avgMot) / 2;
+        } else if (avgMood > 0) {
+            overallMental = avgMood;
+        } else if (avgMot > 0) {
+            overallMental = avgMot;
+        }
 
         const statusText = document.getElementById('burnout-status-text');
         const badge = document.getElementById('burnout-badge');
@@ -1268,8 +1283,17 @@
         warningsBox.innerHTML = '';
         tipsBox.innerHTML = '';
 
-        if (overallMental >= 7.5) {
-            statusText.innerText = 'Стабільний стан (Зелена зона)';
+        if (overallMental === 0) {
+            statusText.innerText = 'Немає даних';
+            statusText.style.color = 'var(--text-muted)';
+            badge.innerText = 'Не оцінено';
+            badge.style.background = '#333';
+            badge.style.color = '#fff';
+
+            warningsBox.innerHTML = `<p>⚪ Заповніть хоча б один день для розрахунку показників вигорання.</p>`;
+            tipsBox.innerHTML = `<div class="tip-item"><strong>Початок обліку:</strong> Внесіть оцінку настрою чи мотивації у таблицю.</div>`;
+        } else if (overallMental >= 7.0) {
+            statusText.innerText = 'Зелена зона / Стабільний стан';
             statusText.style.color = 'var(--accent-green)';
             badge.innerText = 'Низький ризик';
             badge.style.background = 'rgba(34, 197, 94, 0.2)';
@@ -1281,8 +1305,8 @@
                 <div class="tip-item"><strong>Підтримуйте баланс:</strong> Не збільшуйте навантаження різко, навіть якщо відчуваєте приплив сил.</div>
                 <div class="tip-item"><strong>Якісний відпочинок:</strong> Плануйте вечори без екранів та соцмереж для якісного перезавантаження.</div>
             `;
-        } else if (overallMental >= 5.0) {
-            statusText.innerText = 'Помірний тиск (Жовта зона)';
+        } else if (overallMental >= 4.5) {
+            statusText.innerText = 'Жовта зона / Помірний стрес';
             statusText.style.color = 'var(--accent-yellow)';
             badge.innerText = 'Увага';
             badge.style.background = 'rgba(234, 179, 8, 0.2)';
@@ -1296,7 +1320,7 @@
                 <div class="tip-item"><strong>Фокус на сні:</strong> Відновіть якісний сон до 23:00 — це основне джерело дофаміну.</div>
             `;
         } else {
-            statusText.innerText = 'Високий ризик вигорання (Червона зона)';
+            statusText.innerText = 'КРИЗА / Червона зона';
             statusText.style.color = 'var(--accent-red)';
             badge.innerText = 'Криза';
             badge.style.background = 'rgba(239, 68, 68, 0.2)';
@@ -1731,11 +1755,11 @@
         const mobileMood = document.getElementById('mobile-mood-input');
         const mobileMot = document.getElementById('mobile-motivation-input');
 
-        mobileMood.value = state.mood[targetDay] !== undefined ? state.mood[targetDay] : 7;
-        mobileMot.value = state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : 7;
+        mobileMood.value = state.mood[targetDay] !== null && state.mood[targetDay] !== undefined ? state.mood[targetDay] : '';
+        mobileMot.value = state.motivation[targetDay] !== null && state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : '';
 
         mobileMood.onchange = (e) => {
-            const val = parseInt(e.target.value) || 0;
+            const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
             state.mood[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
@@ -1743,7 +1767,7 @@
         };
 
         mobileMot.onchange = (e) => {
-            const val = parseInt(e.target.value) || 0;
+            const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
             state.motivation[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
@@ -1782,9 +1806,9 @@
             mTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const mInput = document.createElement('input');
             mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
-            mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
+            mInput.value = state.mood[d] !== null && state.mood[d] !== undefined ? state.mood[d] : '';
             mInput.addEventListener('change', (e) => {
-                const val = parseInt(e.target.value) || 0;
+                const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
                 state.mood[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
@@ -1797,9 +1821,9 @@
             motTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const motInput = document.createElement('input');
             motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
-            motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
+            motInput.value = state.motivation[d] !== null && state.motivation[d] !== undefined ? state.motivation[d] : '';
             motInput.addEventListener('change', (e) => {
-                const val = parseInt(e.target.value) || 0;
+                const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
                 state.motivation[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
@@ -1965,14 +1989,15 @@
             options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
         });
 
+        // Графік емоційного стану з перериванням ліній у незаповнені дні (spanGaps: false)
         const ctxMental = document.getElementById('mentalChart').getContext('2d');
         mentalChart = new Chart(ctxMental, {
             type: 'line',
             data: {
                 labels: Array.from({length: daysTotal}, (_, i) => i + 1),
                 datasets: [
-                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2 },
-                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2 }
+                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2, spanGaps: false },
+                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2, spanGaps: false }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } }, y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } } } }
@@ -2035,6 +2060,8 @@
     function resetMonthData() {
         if (confirm("Reset all marks for this month?")) {
             state.habits.forEach((_, i) => { state.checks[i] = Array(daysTotal).fill(false); });
+            state.mood = Array(daysTotal).fill(null);
+            state.motivation = Array(daysTotal).fill(null);
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
