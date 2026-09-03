@@ -83,7 +83,6 @@
             gap: 20px;
         }
 
-        /* Top Bar Controls */
         .top-navbar {
             display: flex;
             justify-content: space-between;
@@ -166,7 +165,6 @@
             width: 100%;
         }
 
-        /* Habit Tracker Styles */
         .analytics-toggle-btn {
             display: none;
             width: 100%;
@@ -501,7 +499,6 @@
             font-weight: bold;
         }
 
-        /* Budget Tracker Styles */
         .widget-title {
             font-size: 0.75rem;
             color: var(--text-secondary);
@@ -620,7 +617,6 @@
             border: 1px solid var(--card-border);
         }
 
-        /* Modal Box for Sync */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -652,7 +648,6 @@
             display: inline-block;
         }
 
-        /* 3rd Tab Specific Styles (Mindset & Recovery) */
         .mindset-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -699,7 +694,6 @@
             margin-bottom: 2px;
         }
 
-        /* Responsive Mobile Optimization */
         @media (max-width: 900px) {
             body { padding: 8px; }
             .dashboard-container { padding: 12px; gap: 15px; }
@@ -712,52 +706,18 @@
             .mental-inputs-table { display: none; }
             .mobile-mental-inputs { display: flex; }
 
-            /* Mobile Budget Table Card Transformation */
-            .budget-table thead {
-                display: none;
-            }
-
-            .budget-table, .budget-table tbody, .budget-table tr, .budget-table td {
-                display: block;
-                width: 100%;
-            }
-
-            .budget-table tr {
-                margin-bottom: 12px;
-                background: #161616;
-                border: 1px solid var(--card-border);
-                border-radius: 8px;
-                padding: 10px 14px;
-            }
-
-            .budget-table td {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 1px solid #282828;
-                padding: 8px 0;
-                font-size: 0.85rem;
-                white-space: normal;
-            }
-
-            .budget-table td:last-child {
-                border-bottom: none;
-            }
-
-            .budget-table td::before {
-                content: attr(data-label);
-                font-weight: 600;
-                color: var(--text-secondary);
-                font-size: 0.75rem;
-                text-transform: uppercase;
-            }
+            .budget-table thead { display: none; }
+            .budget-table, .budget-table tbody, .budget-table tr, .budget-table td { display: block; width: 100%; }
+            .budget-table tr { margin-bottom: 12px; background: #161616; border: 1px solid var(--card-border); border-radius: 8px; padding: 10px 14px; }
+            .budget-table td { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding: 8px 0; font-size: 0.85rem; white-space: normal; }
+            .budget-table td:last-child { border-bottom: none; }
+            .budget-table td::before { content: attr(data-label); font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; }
         }
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
-    <!-- Unified Top Navigation Bar -->
     <div class="top-navbar">
         <div>
             <h1 id="app-title">HABIT TRACKER</h1>
@@ -766,16 +726,13 @@
         <div class="controls-group">
             <span id="sync-status" class="sync-badge">☁ Ready</span>
             
-            <!-- Navigation View Switches -->
             <button id="nav-habits-btn" class="btn btn-primary" onclick="switchTab('habits')">Habits</button>
             <button id="nav-budget-btn" class="btn" onclick="switchTab('budget')">Budget</button>
             <button id="nav-mindset-btn" class="btn" onclick="switchTab('mindset')">Mindset & Recovery</button>
 
-            <!-- Date Selectors -->
             <select id="year-select" onchange="changeCalendarMonth()"></select>
             <select id="month-select" onchange="changeCalendarMonth()"></select>
 
-            <!-- Action Buttons -->
             <button id="add-habit-btn" class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
             <button id="add-record-btn" class="btn btn-primary" onclick="addTransactionPrompt()" style="display: none;">+ Record</button>
             <button class="btn" onclick="openSyncModal()">Sync ID</button>
@@ -862,11 +819,11 @@
                 <div class="mobile-mental-inputs">
                     <div class="mobile-mental-item">
                         <span>Mood (Today):</span>
-                        <input type="number" id="mobile-mood-input" min="1" max="10">
+                        <input type="number" id="mobile-mood-input" min="1" max="10" placeholder="-">
                     </div>
                     <div class="mobile-mental-item">
                         <span>Motivation (Today):</span>
-                        <input type="number" id="mobile-motivation-input" min="1" max="10">
+                        <input type="number" id="mobile-motivation-input" min="1" max="10" placeholder="-">
                     </div>
                 </div>
 
@@ -968,9 +925,7 @@
                     <div style="width: 110px; height: 110px; flex-shrink: 0; position: relative;">
                         <canvas id="categoryChart"></canvas>
                     </div>
-                    <div id="category-legend-list" style="flex: 1; display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;">
-                        <!-- Dynamic Categories -->
-                    </div>
+                    <div id="category-legend-list" style="flex: 1; display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;"></div>
                 </div>
             </div>
 
@@ -998,11 +953,11 @@
                 <div class="status-box">
                     <div>
                         <div class="stat-label">Середній настрій</div>
-                        <div class="stat-value" id="avg-mood-val">0 / 10</div>
+                        <div class="stat-value" id="avg-mood-val">- / 10</div>
                     </div>
                     <div>
                         <div class="stat-label">Середня мотивація</div>
-                        <div class="stat-value" id="avg-mot-val">0 / 10</div>
+                        <div class="stat-value" id="avg-mot-val">- / 10</div>
                     </div>
                 </div>
 
@@ -1019,16 +974,12 @@
         <div class="mindset-grid">
             <div class="card">
                 <div class="card-header" style="text-align: left;">Застереження та Сигнали</div>
-                <div id="burnout-warnings" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #ccc;">
-                    <!-- Динамічні застереження -->
-                </div>
+                <div id="burnout-warnings" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #ccc;"></div>
             </div>
 
             <div class="card">
                 <div class="card-header" style="text-align: left;">Поради для відновлення ресурсу</div>
-                <div class="tips-list" id="recovery-tips-list">
-                    <!-- Динамічні поради -->
-                </div>
+                <div class="tips-list" id="recovery-tips-list"></div>
             </div>
         </div>
     </div>
@@ -1062,13 +1013,6 @@
         "Без цукру та фастфуду 🥗",
         "Вечірня рефлексія 📔",
         "Сон до 23:00 🌙"
-    ];
-
-    const defaultTransactions = [
-        { date: "26 Серпня", desc: "Аванс / Основний дохід", cat: "Робота", type: "income", amount: 30000 },
-        { date: "25 Серпня", desc: "Продукти (Сільпо)", cat: "Харчування", type: "expense", amount: 6000 },
-        { date: "24 Серпня", desc: "Поповнення накопичувального банку", cat: "Спільний фонд", type: "saved", amount: 5500 },
-        { date: "22 Серпня", desc: "Кав’ярні та розваги", cat: "Відпочинок", type: "expense", amount: 6000 }
     ];
 
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -1196,27 +1140,78 @@
         document.getElementById('current-month-display').innerText = `- ${monthNames[currentMonth]} ${currentYear} (${daysTotal} DAYS) -`;
     }
 
-    function normalizeState() {
-        if (!Array.isArray(state.habits)) state.habits = [...defaultHabits];
-        if (!state.checks || typeof state.checks !== 'object') state.checks = {};
-        
-        if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
-            state.budget = Object.values(state.budget);
+    function getPreviousMonthKey() {
+        let prevM = currentMonth - 1;
+        let prevY = currentYear;
+        if (prevM < 0) {
+            prevM = 11;
+            prevY -= 1;
         }
-        if (!Array.isArray(state.budget)) state.budget = [...defaultTransactions];
+        return `darkHabitTrackerState_${prevY}_${prevM}`;
+    }
+
+    function calculatePreviousMonthTotals() {
+        const prevKey = getPreviousMonthKey();
+        const prevSaved = localStorage.getItem(prevKey);
+        let carryOverBalance = 0;
+        let carryOverSaved = 0;
+
+        if (prevSaved) {
+            try {
+                const prevData = JSON.parse(prevSaved);
+                const prevBudget = Array.isArray(prevData.budget) ? prevData.budget : (prevData.budget ? Object.values(prevData.budget) : []);
+                
+                let inc = 0, exp = 0, sav = 0;
+                prevBudget.forEach(item => {
+                    if (item.type === 'expense') exp += item.amount;
+                    else if (item.type === 'saved') sav += item.amount;
+                    else inc += item.amount;
+                });
+                carryOverBalance = inc - exp - sav;
+                carryOverSaved = sav;
+            } catch (e) {}
+        }
+        return { carryOverBalance, carryOverSaved };
+    }
+
+    function normalizeState() {
+        const prevKey = getPreviousMonthKey();
+        const prevSaved = localStorage.getItem(prevKey);
+        let inheritedHabits = [...defaultHabits];
+
+        if (prevSaved) {
+            try {
+                const prevData = JSON.parse(prevSaved);
+                if (Array.isArray(prevData.habits) && prevData.habits.length > 0) {
+                    inheritedHabits = [...prevData.habits];
+                }
+            } catch (e) {}
+        }
+
+        if (!Array.isArray(state.habits) || state.habits.length === 0) {
+            state.habits = inheritedHabits;
+        }
+
+        if (!state.checks || typeof state.checks !== 'object') state.checks = {};
         
         state.habits.forEach((_, idx) => {
             if (!Array.isArray(state.checks[idx]) || state.checks[idx].length !== daysTotal) {
-                const oldArr = state.checks[idx] || [];
-                state.checks[idx] = Array.from({length: daysTotal}, (_, dIdx) => Boolean(oldArr[dIdx]));
+                state.checks[idx] = Array.from({length: daysTotal}, () => false);
             }
         });
 
         if (!Array.isArray(state.mood) || state.mood.length !== daysTotal) {
-            state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? 7);
+            state.mood = Array.from({length: daysTotal}, () => null);
         }
         if (!Array.isArray(state.motivation) || state.motivation.length !== daysTotal) {
-            state.motivation = Array.from({length: daysTotal}, (_, dIdx) => state.motivation?.[dIdx] ?? 8);
+            state.motivation = Array.from({length: daysTotal}, () => null);
+        }
+
+        if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
+            state.budget = Object.values(state.budget);
+        }
+        if (!Array.isArray(state.budget)) {
+            state.budget = [];
         }
     }
 
@@ -1225,6 +1220,8 @@
         const saved = localStorage.getItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`);
         if (saved) {
             try { state = JSON.parse(saved); } catch (e) { state = {}; }
+        } else {
+            state = {};
         }
         normalizeState();
 
@@ -1249,16 +1246,14 @@
 
     /* --- Mindset & Recovery Tab Logic --- */
     function renderMindsetTab() {
-        const moodArr = state.mood.filter(v => typeof v === 'number' && !isNaN(v));
-        const motArr = state.motivation.filter(v => typeof v === 'number' && !isNaN(v));
+        const moodArr = state.mood.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(v)).map(Number);
+        const motArr = state.motivation.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(v)).map(Number);
 
-        const avgMood = moodArr.length ? (moodArr.reduce((a, b) => a + b, 0) / moodArr.length).toFixed(1) : 0;
-        const avgMot = motArr.length ? (motArr.reduce((a, b) => a + b, 0) / motArr.length).toFixed(1) : 0;
+        const avgMood = moodArr.length ? (moodArr.reduce((a, b) => a + b, 0) / moodArr.length).toFixed(1) : "-";
+        const avgMot = motArr.length ? (motArr.reduce((a, b) => a + b, 0) / motArr.length).toFixed(1) : "-";
 
-        document.getElementById('avg-mood-val').innerText = `${avgMood} / 10`;
-        document.getElementById('avg-mot-val').innerText = `${avgMot} / 10`;
-
-        const overallMental = (parseFloat(avgMood) + parseFloat(avgMot)) / 2;
+        document.getElementById('avg-mood-val').innerText = moodArr.length ? `${avgMood} / 10` : "- / 10";
+        document.getElementById('avg-mot-val').innerText = motArr.length ? `${avgMot} / 10` : "- / 10";
 
         const statusText = document.getElementById('burnout-status-text');
         const badge = document.getElementById('burnout-badge');
@@ -1267,6 +1262,20 @@
 
         warningsBox.innerHTML = '';
         tipsBox.innerHTML = '';
+
+        if (!moodArr.length && !motArr.length) {
+            statusText.innerText = 'Недостатньо даних';
+            statusText.style.color = 'var(--text-muted)';
+            badge.innerText = 'Немає оцінок';
+            badge.style.background = '#333';
+            badge.style.color = '#fff';
+            warningsBox.innerHTML = `<p>Заповніть оцінки настрою або мотивації внизу таблиці звичок, щоб отримати аналіз стану.</p>`;
+            return;
+        }
+
+        const numericMood = moodArr.length ? parseFloat(avgMood) : 7;
+        const numericMot = motArr.length ? parseFloat(avgMot) : 7;
+        const overallMental = (numericMood + numericMot) / 2;
 
         if (overallMental >= 7.5) {
             statusText.innerText = 'Стабільний стан (Зелена зона)';
@@ -1312,15 +1321,33 @@
         }
     }
 
-    /* --- Budget Functionality & Dynamic Category Chart --- */
+    /* --- Budget Functionality --- */
     function renderBudget() {
         const tbody = document.getElementById('budget-tbody');
         if (!tbody) return;
         tbody.innerHTML = '';
 
-        let totalIncome = 0;
+        const { carryOverBalance, carryOverSaved } = calculatePreviousMonthTotals();
+
+        let totalIncome = carryOverBalance > 0 ? carryOverBalance : 0;
         let totalExpense = 0;
-        let totalSaved = 0;
+        let totalSaved = carryOverSaved;
+
+        if (carryOverBalance !== 0 || carryOverSaved !== 0) {
+            const tr = document.createElement('tr');
+            tr.style.opacity = '0.85';
+            tr.style.fontStyle = 'italic';
+            tr.innerHTML = `
+                <td data-label="Date">1 ${monthNames[currentMonth].substring(0, 3)}</td>
+                <td data-label="Description">Залишок з минулого місяця</td>
+                <td data-label="Category">Перенос</td>
+                <td data-label="Type"><span class="tag tag-income">Баланс</span></td>
+                <td data-label="Sum" style="font-weight: 700; color: var(--accent-green); text-align: right;">
+                    +${carryOverBalance.toLocaleString()} ₴
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
 
         state.budget.forEach((item, index) => {
             const tr = document.createElement('tr');
@@ -1359,7 +1386,7 @@
             tbody.appendChild(tr);
         });
 
-        const totalBalance = totalIncome - totalExpense - totalSaved;
+        const totalBalance = totalIncome - totalExpense - (totalSaved - carryOverSaved);
 
         document.getElementById('b-total-balance').innerText = `${totalBalance.toLocaleString()} ₴`;
         document.getElementById('b-total-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
@@ -1408,7 +1435,7 @@
         if (legendContainer) {
             legendContainer.innerHTML = '';
             if (sortedCategories.length === 0) {
-                legendContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">No expenses recorded</span>';
+                legendContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">No expenses recorded this month</span>';
             } else {
                 sortedCategories.forEach((cat, idx) => {
                     const amt = sortedValues[idx];
@@ -1564,7 +1591,6 @@
         window.dbUpdate(window.dbRef(window.db), updates);
     }
 
-    /* --- Sync Modal --- */
     function openSyncModal() {
         const modal = document.getElementById('sync-modal');
         const input = document.getElementById('sync-id-input');
@@ -1592,7 +1618,6 @@
         }
     }
 
-    /* --- Rendering Logic --- */
     function getTodayIndex() {
         const now = new Date();
         if (now.getFullYear() === currentYear && now.getMonth() === currentMonth) {
@@ -1731,11 +1756,11 @@
         const mobileMood = document.getElementById('mobile-mood-input');
         const mobileMot = document.getElementById('mobile-motivation-input');
 
-        mobileMood.value = state.mood[targetDay] !== undefined ? state.mood[targetDay] : 7;
-        mobileMot.value = state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : 7;
+        mobileMood.value = state.mood[targetDay] !== null && state.mood[targetDay] !== undefined ? state.mood[targetDay] : '';
+        mobileMot.value = state.motivation[targetDay] !== null && state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : '';
 
         mobileMood.onchange = (e) => {
-            const val = parseInt(e.target.value) || 0;
+            const val = e.target.value === '' ? null : parseInt(e.target.value);
             state.mood[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
@@ -1743,7 +1768,7 @@
         };
 
         mobileMot.onchange = (e) => {
-            const val = parseInt(e.target.value) || 0;
+            const val = e.target.value === '' ? null : parseInt(e.target.value);
             state.motivation[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
@@ -1781,10 +1806,10 @@
             const mTd = document.createElement('td');
             mTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const mInput = document.createElement('input');
-            mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
-            mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
+            mInput.type = 'number'; mInput.min = '1'; mInput.max = '10'; mInput.placeholder = '-';
+            mInput.value = state.mood[d] !== null && state.mood[d] !== undefined ? state.mood[d] : '';
             mInput.addEventListener('change', (e) => {
-                const val = parseInt(e.target.value) || 0;
+                const val = e.target.value === '' ? null : parseInt(e.target.value);
                 state.mood[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
@@ -1796,10 +1821,10 @@
             const motTd = document.createElement('td');
             motTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const motInput = document.createElement('input');
-            motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
-            motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
+            motInput.type = 'number'; motInput.min = '1'; motInput.max = '10'; motInput.placeholder = '-';
+            motInput.value = state.motivation[d] !== null && state.motivation[d] !== undefined ? state.motivation[d] : '';
             motInput.addEventListener('change', (e) => {
-                const val = parseInt(e.target.value) || 0;
+                const val = e.target.value === '' ? null : parseInt(e.target.value);
                 state.motivation[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
@@ -1971,8 +1996,8 @@
             data: {
                 labels: Array.from({length: daysTotal}, (_, i) => i + 1),
                 datasets: [
-                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2 },
-                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2 }
+                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2, spanGaps: true },
+                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2, spanGaps: true }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } }, y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } } } }
@@ -2035,6 +2060,8 @@
     function resetMonthData() {
         if (confirm("Reset all marks for this month?")) {
             state.habits.forEach((_, i) => { state.checks[i] = Array(daysTotal).fill(false); });
+            state.mood = Array(daysTotal).fill(null);
+            state.motivation = Array(daysTotal).fill(null);
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
