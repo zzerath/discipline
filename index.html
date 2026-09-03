@@ -2025,7 +2025,7 @@
             const li = document.createElement('li');
             li.className = 'top-habit-item';
             li.innerHTML = `<span>${index + 1}. ${item.name}</span><span style="font-weight: 700; color: #ffffff;">${item.pct}%</span>`;
-            list.appendChild(li);
+            list.appendChild(list.appendChild(li));
         });
     }
 
