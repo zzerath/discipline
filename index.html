@@ -712,6 +712,7 @@
             .mental-inputs-table { display: none; }
             .mobile-mental-inputs { display: flex; }
 
+            /* Mobile Budget Table Card Transformation */
             .budget-table thead {
                 display: none;
             }
@@ -968,6 +969,7 @@
                         <canvas id="categoryChart"></canvas>
                     </div>
                     <div id="category-legend-list" style="flex: 1; display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;">
+                        <!-- Dynamic Categories -->
                     </div>
                 </div>
             </div>
@@ -1018,12 +1020,14 @@
             <div class="card">
                 <div class="card-header" style="text-align: left;">Застереження та Сигнали</div>
                 <div id="burnout-warnings" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #ccc;">
+                    <!-- Динамічні застереження -->
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-header" style="text-align: left;">Поради для відновлення ресурсу</div>
                 <div class="tips-list" id="recovery-tips-list">
+                    <!-- Динамічні поради -->
                 </div>
             </div>
         </div>
@@ -1060,6 +1064,13 @@
         "Сон до 23:00 🌙"
     ];
 
+    const defaultTransactions = [
+        { date: "26 Серпня", desc: "Аванс / Основний дохід", cat: "Робота", type: "income", amount: 30000 },
+        { date: "25 Серпня", desc: "Продукти (Сільпо)", cat: "Харчування", type: "expense", amount: 6000 },
+        { date: "24 Серпня", desc: "Поповнення накопичувального банку", cat: "Спільний фонд", type: "saved", amount: 5500 },
+        { date: "22 Серпня", desc: "Кав’ярні та розваги", cat: "Відпочинок", type: "expense", amount: 6000 }
+    ];
+
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -1072,20 +1083,10 @@
     let daysTotal = 31;
     let activeTab = 'habits';
 
-    // 1. Фіксуємо ID користувача у LocalStorage для запобігання дублювання в Firebase
-    function getOrCreateSyncUserId() {
-        const urlParams = new URLSearchParams(window.location.search);
-        let idFromUrl = urlParams.get('syncId');
-        let idFromStorage = localStorage.getItem('habitTracker_syncId');
-        
-        let finalId = idFromUrl || idFromStorage || ('user-' + Math.random().toString(36).substr(2, 6));
-        finalId = finalId.trim().replace(/[.#$\[\]/]/g, '');
-        
-        localStorage.setItem('habitTracker_syncId', finalId);
-        return finalId;
-    }
-
-    let syncUserId = getOrCreateSyncUserId();
+    const urlParams = new URLSearchParams(window.location.search);
+    let syncUserId = urlParams.get('syncId') || localStorage.getItem('habitTracker_syncId') || 'user-' + Math.random().toString(36).substr(2, 6);
+    syncUserId = syncUserId.trim().replace(/[.#$\[\]/]/g, '');
+    localStorage.setItem('habitTracker_syncId', syncUserId);
 
     let state = {
         habits: [],
@@ -1104,14 +1105,6 @@
     let timerTimeLeft = timerDuration;
     let timerInterval = null;
     let isTimerRunning = false;
-
-    function calculateAverageMetric(dataArray) {
-        if (!Array.isArray(dataArray)) return 0;
-        const validEntries = dataArray.filter(value => value !== null && value !== undefined && value !== 0 && value !== "");
-        if (validEntries.length === 0) return 0;
-        const sum = validEntries.reduce((acc, curr) => acc + Number(curr), 0);
-        return parseFloat((sum / validEntries.length).toFixed(1));
-    }
 
     window.addEventListener('DOMContentLoaded', () => {
         setupDateControls();
@@ -1196,7 +1189,6 @@
         calculateDaysInMonth();
         loadLocalData();
         setupFirebaseSync();
-        renderBudget();
     }
 
     function calculateDaysInMonth() {
@@ -1211,7 +1203,7 @@
         if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
             state.budget = Object.values(state.budget);
         }
-        if (!Array.isArray(state.budget)) state.budget = [];
+        if (!Array.isArray(state.budget)) state.budget = [...defaultTransactions];
         
         state.habits.forEach((_, idx) => {
             if (!Array.isArray(state.checks[idx]) || state.checks[idx].length !== daysTotal) {
@@ -1221,10 +1213,10 @@
         });
 
         if (!Array.isArray(state.mood) || state.mood.length !== daysTotal) {
-            state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? null);
+            state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? 7);
         }
         if (!Array.isArray(state.motivation) || state.motivation.length !== daysTotal) {
-            state.motivation = Array.from({length: daysTotal}, (_, dIdx) => state.motivation?.[dIdx] ?? null);
+            state.motivation = Array.from({length: daysTotal}, (_, dIdx) => state.motivation?.[dIdx] ?? 8);
         }
     }
 
@@ -1257,20 +1249,16 @@
 
     /* --- Mindset & Recovery Tab Logic --- */
     function renderMindsetTab() {
-        const avgMood = calculateAverageMetric(state.mood);
-        const avgMot = calculateAverageMetric(state.motivation);
+        const moodArr = state.mood.filter(v => typeof v === 'number' && !isNaN(v));
+        const motArr = state.motivation.filter(v => typeof v === 'number' && !isNaN(v));
 
-        document.getElementById('avg-mood-val').innerText = avgMood > 0 ? `${avgMood} / 10` : "—";
-        document.getElementById('avg-mot-val').innerText = avgMot > 0 ? `${avgMot} / 10` : "—";
+        const avgMood = moodArr.length ? (moodArr.reduce((a, b) => a + b, 0) / moodArr.length).toFixed(1) : 0;
+        const avgMot = motArr.length ? (motArr.reduce((a, b) => a + b, 0) / motArr.length).toFixed(1) : 0;
 
-        let overallMental = 0;
-        if (avgMood > 0 && avgMot > 0) {
-            overallMental = (avgMood + avgMot) / 2;
-        } else if (avgMood > 0) {
-            overallMental = avgMood;
-        } else if (avgMot > 0) {
-            overallMental = avgMot;
-        }
+        document.getElementById('avg-mood-val').innerText = `${avgMood} / 10`;
+        document.getElementById('avg-mot-val').innerText = `${avgMot} / 10`;
+
+        const overallMental = (parseFloat(avgMood) + parseFloat(avgMot)) / 2;
 
         const statusText = document.getElementById('burnout-status-text');
         const badge = document.getElementById('burnout-badge');
@@ -1280,17 +1268,8 @@
         warningsBox.innerHTML = '';
         tipsBox.innerHTML = '';
 
-        if (overallMental === 0) {
-            statusText.innerText = 'Немає даних';
-            statusText.style.color = 'var(--text-muted)';
-            badge.innerText = 'Не оцінено';
-            badge.style.background = '#333';
-            badge.style.color = '#fff';
-
-            warningsBox.innerHTML = `<p>⚪ Заповніть хоча б один день для розрахунку показників вигорання.</p>`;
-            tipsBox.innerHTML = `<div class="tip-item"><strong>Початок обліку:</strong> Внесіть оцінку настрою чи мотивації у таблицю.</div>`;
-        } else if (overallMental >= 7.0) {
-            statusText.innerText = 'Зелена зона / Стабільний стан';
+        if (overallMental >= 7.5) {
+            statusText.innerText = 'Стабільний стан (Зелена зона)';
             statusText.style.color = 'var(--accent-green)';
             badge.innerText = 'Низький ризик';
             badge.style.background = 'rgba(34, 197, 94, 0.2)';
@@ -1302,8 +1281,8 @@
                 <div class="tip-item"><strong>Підтримуйте баланс:</strong> Не збільшуйте навантаження різко, навіть якщо відчуваєте приплив сил.</div>
                 <div class="tip-item"><strong>Якісний відпочинок:</strong> Плануйте вечори без екранів та соцмереж для якісного перезавантаження.</div>
             `;
-        } else if (overallMental >= 4.5) {
-            statusText.innerText = 'Жовта зона / Помірний стрес';
+        } else if (overallMental >= 5.0) {
+            statusText.innerText = 'Помірний тиск (Жовта зона)';
             statusText.style.color = 'var(--accent-yellow)';
             badge.innerText = 'Увага';
             badge.style.background = 'rgba(234, 179, 8, 0.2)';
@@ -1317,7 +1296,7 @@
                 <div class="tip-item"><strong>Фокус на сні:</strong> Відновіть якісний сон до 23:00 — це основне джерело дофаміну.</div>
             `;
         } else {
-            statusText.innerText = 'КРИЗА / Червона зона';
+            statusText.innerText = 'Високий ризик вигорання (Червона зона)';
             statusText.style.color = 'var(--accent-red)';
             badge.innerText = 'Криза';
             badge.style.background = 'rgba(239, 68, 68, 0.2)';
@@ -1333,7 +1312,7 @@
         }
     }
 
-    /* --- Budget Functionality (з прив'язкою до місяців) --- */
+    /* --- Budget Functionality & Dynamic Category Chart --- */
     function renderBudget() {
         const tbody = document.getElementById('budget-tbody');
         if (!tbody) return;
@@ -1343,14 +1322,7 @@
         let totalExpense = 0;
         let totalSaved = 0;
 
-        // Фільтрація за вибраним місяцем та роком
-        const monthTransactions = state.budget.filter(item => {
-            return (item.year === undefined || item.year === currentYear) && 
-                   (item.month === undefined || item.month === currentMonth);
-        });
-
-        monthTransactions.forEach((item) => {
-            const originalIndex = state.budget.indexOf(item);
+        state.budget.forEach((item, index) => {
             const tr = document.createElement('tr');
 
             let tagClass = 'tag-income';
@@ -1381,7 +1353,7 @@
                 <td data-label="Type"><span class="tag ${tagClass}">${tagText}</span></td>
                 <td data-label="Sum" style="font-weight: 700; color: ${amountColor}; text-align: right;">
                     ${amountPrefix}${item.amount.toLocaleString()} ₴
-                    <span class="delete-btn" onclick="deleteTransaction(${originalIndex})">×</span>
+                    <span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1393,7 +1365,7 @@
         document.getElementById('b-total-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-total-expense').innerText = `-${totalExpense.toLocaleString()} ₴`;
         document.getElementById('b-total-saved').innerText = `${totalSaved.toLocaleString()} ₴`;
-        document.getElementById('b-records-count').innerText = `Total entries: ${monthTransactions.length}`;
+        document.getElementById('b-records-count').innerText = `Total entries: ${state.budget.length}`;
 
         document.getElementById('b-summary-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
@@ -1408,14 +1380,14 @@
         document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
 
-        renderCategoryAnalytics(monthTransactions);
+        renderCategoryAnalytics();
     }
 
-    function renderCategoryAnalytics(monthTransactions) {
+    function renderCategoryAnalytics() {
         const categoryTotals = {};
         let totalExpenseSum = 0;
 
-        monthTransactions.forEach(item => {
+        state.budget.forEach(item => {
             if (item.type === 'expense') {
                 const cat = item.cat || 'Other';
                 categoryTotals[cat] = (categoryTotals[cat] || 0) + item.amount;
@@ -1508,17 +1480,7 @@
         const amount = parseFloat(amountStr) || 0;
         const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
 
-        // Прив'язка запису до поточного року та місяця
-        state.budget.unshift({ 
-            date: dateNow, 
-            desc: desc.trim(), 
-            cat: cat.trim(), 
-            type, 
-            amount,
-            year: currentYear,
-            month: currentMonth
-        });
-
+        state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: cat.trim(), type, amount });
         saveLocalData();
         pushFullStateToFirebase();
         renderBudget();
@@ -1769,11 +1731,11 @@
         const mobileMood = document.getElementById('mobile-mood-input');
         const mobileMot = document.getElementById('mobile-motivation-input');
 
-        mobileMood.value = state.mood[targetDay] !== null && state.mood[targetDay] !== undefined ? state.mood[targetDay] : '';
-        mobileMot.value = state.motivation[targetDay] !== null && state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : '';
+        mobileMood.value = state.mood[targetDay] !== undefined ? state.mood[targetDay] : 7;
+        mobileMot.value = state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : 7;
 
         mobileMood.onchange = (e) => {
-            const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
+            const val = parseInt(e.target.value) || 0;
             state.mood[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
@@ -1781,7 +1743,7 @@
         };
 
         mobileMot.onchange = (e) => {
-            const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
+            const val = parseInt(e.target.value) || 0;
             state.motivation[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
@@ -1820,9 +1782,9 @@
             mTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const mInput = document.createElement('input');
             mInput.type = 'number'; mInput.min = '1'; mInput.max = '10';
-            mInput.value = state.mood[d] !== null && state.mood[d] !== undefined ? state.mood[d] : '';
+            mInput.value = state.mood[d] !== undefined ? state.mood[d] : 7;
             mInput.addEventListener('change', (e) => {
-                const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
+                const val = parseInt(e.target.value) || 0;
                 state.mood[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
@@ -1835,9 +1797,9 @@
             motTd.className = `${isWeekend ? 'is-weekend' : ''} ${todayFlag ? 'is-today' : ''}`;
             const motInput = document.createElement('input');
             motInput.type = 'number'; motInput.min = '1'; motInput.max = '10';
-            motInput.value = state.motivation[d] !== null && state.motivation[d] !== undefined ? state.motivation[d] : '';
+            motInput.value = state.motivation[d] !== undefined ? state.motivation[d] : 7;
             motInput.addEventListener('change', (e) => {
-                const val = e.target.value !== '' ? (parseInt(e.target.value) || null) : null;
+                const val = parseInt(e.target.value) || 0;
                 state.motivation[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
@@ -2009,8 +1971,8 @@
             data: {
                 labels: Array.from({length: daysTotal}, (_, i) => i + 1),
                 datasets: [
-                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2, spanGaps: false },
-                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2, spanGaps: false }
+                    { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2 },
+                    { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2 }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } }, y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } } } }
@@ -2073,8 +2035,6 @@
     function resetMonthData() {
         if (confirm("Reset all marks for this month?")) {
             state.habits.forEach((_, i) => { state.checks[i] = Array(daysTotal).fill(false); });
-            state.mood = Array(daysTotal).fill(null);
-            state.motivation = Array(daysTotal).fill(null);
             saveLocalData();
             pushFullStateToFirebase();
             renderTable();
