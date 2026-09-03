@@ -1174,6 +1174,28 @@
         return { carryOverBalance, carryOverSaved };
     }
 
+    // Firebase видаляє ключі зі значенням null, тому масив із пропущеними
+    // (незаповненими) днями повертається з бази не масивом, а об'єктом
+    // виду {"0": 5, "2": 7}. Ця функція завжди відновлює масив фіксованої
+    // довжини, підставляючи fillValue у порожні позиції — незалежно від
+    // того, прийшло джерело масивом чи розрідженим об'єктом.
+    function toIndexedArray(source, length, fillValue = null) {
+        const result = Array.from({ length }, () => fillValue);
+        if (Array.isArray(source)) {
+            source.forEach((v, i) => {
+                if (i < length && v !== undefined && v !== null) result[i] = v;
+            });
+        } else if (source && typeof source === 'object') {
+            Object.keys(source).forEach(key => {
+                const idx = parseInt(key, 10);
+                if (!isNaN(idx) && idx >= 0 && idx < length && source[key] !== undefined && source[key] !== null) {
+                    result[idx] = source[key];
+                }
+            });
+        }
+        return result;
+    }
+
     function normalizeState() {
         const prevKey = getPreviousMonthKey();
         const prevSaved = localStorage.getItem(prevKey);
@@ -1200,12 +1222,8 @@
             }
         });
 
-        if (!Array.isArray(state.mood) || state.mood.length !== daysTotal) {
-            state.mood = Array.from({length: daysTotal}, () => null);
-        }
-        if (!Array.isArray(state.motivation) || state.motivation.length !== daysTotal) {
-            state.motivation = Array.from({length: daysTotal}, () => null);
-        }
+        state.mood = toIndexedArray(state.mood, daysTotal, null);
+        state.motivation = toIndexedArray(state.motivation, daysTotal, null);
 
         if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
             state.budget = Object.values(state.budget);
@@ -2016,7 +2034,12 @@
         weeklyChart.data.datasets[0].data = weeks; weeklyChart.update();
     }
     function updateOverallChart(completed, left) { overallChart.data.datasets[0].data = [completed, left]; overallChart.update(); }
-    function updateMentalChart() { mentalChart.data.datasets[0].data = state.mood; mentalChart.data.datasets[1].data = state.motivation; mentalChart.update(); }
+    function updateMentalChart() {
+        mentalChart.data.labels = Array.from({length: daysTotal}, (_, i) => i + 1);
+        mentalChart.data.datasets[0].data = state.mood;
+        mentalChart.data.datasets[1].data = state.motivation;
+        mentalChart.update();
+    }
     function updateTopHabitsList(stats) {
         const sorted = [...stats].sort((a, b) => b.pct - a.pct).slice(0, 10);
         const list = document.getElementById('top-habits-list');
@@ -2025,7 +2048,7 @@
             const li = document.createElement('li');
             li.className = 'top-habit-item';
             li.innerHTML = `<span>${index + 1}. ${item.name}</span><span style="font-weight: 700; color: #ffffff;">${item.pct}%</span>`;
-            list.appendChild(list.appendChild(li));
+            list.appendChild(li);
         });
     }
 
@@ -2044,10 +2067,17 @@
 
     function deleteHabit(index) {
         if (confirm(`Delete habit "${state.habits[index]}"?`)) {
+            const oldChecks = state.checks;
+            const oldLength = state.habits.length;
             state.habits.splice(index, 1);
-            delete state.checks[index];
+
             const newChecks = {};
-            state.habits.forEach((_, i) => { newChecks[i] = state.checks[i] || Array(daysTotal).fill(false); });
+            let newIdx = 0;
+            for (let oldIdx = 0; oldIdx < oldLength; oldIdx++) {
+                if (oldIdx === index) continue; // пропускаємо видалену звичку
+                newChecks[newIdx] = oldChecks[oldIdx] || Array(daysTotal).fill(false);
+                newIdx++;
+            }
             state.checks = newChecks;
             saveLocalData();
             pushFullStateToFirebase();
