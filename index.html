@@ -736,7 +736,7 @@
             <button id="add-habit-btn" class="btn btn-primary" onclick="addHabitPrompt()">+ Habit</button>
             <button id="add-record-btn" class="btn btn-primary" onclick="addTransactionPrompt()" style="display: none;">+ Record</button>
             <button class="btn" onclick="openSyncModal()">Sync ID</button>
-            <button id="reset-btn" class="btn" onclick="resetMonthData()">Reset</button>
+            <button id="reset-btn" class="btn" onclick="handleResetClick()">Reset</button>
         </div>
     </div>
 
@@ -1069,6 +1069,7 @@
 
         const addHabitBtn = document.getElementById('add-habit-btn');
         const addRecordBtn = document.getElementById('add-record-btn');
+        const resetBtn = document.getElementById('reset-btn');
         const appTitle = document.getElementById('app-title');
 
         habitsView.style.display = 'none';
@@ -1081,6 +1082,7 @@
 
         addHabitBtn.style.display = 'none';
         addRecordBtn.style.display = 'none';
+        resetBtn.style.display = 'inline-block';
 
         if (tab === 'habits') {
             habitsView.style.display = 'flex';
@@ -1097,6 +1099,7 @@
             mindsetView.style.display = 'flex';
             mindsetBtn.className = 'btn btn-primary';
             appTitle.innerText = 'MINDSET & RECOVERY';
+            resetBtn.style.display = 'none'; // тут немає власних даних для скидання
             renderMindsetTab();
         }
     }
@@ -1194,6 +1197,15 @@
             });
         }
         return result;
+    }
+
+    // Обмежує введене значення настрою/мотивації діапазоном 1-10.
+    // Порожнє значення залишається null (день просто не оцінений).
+    function clampMoodValue(raw) {
+        if (raw === '' || raw === null || raw === undefined) return null;
+        const n = parseInt(raw, 10);
+        if (isNaN(n)) return null;
+        return Math.min(10, Math.max(1, n));
     }
 
     function normalizeState() {
@@ -1513,19 +1525,30 @@
 
     function addTransactionPrompt() {
         const desc = prompt("Enter description / source:");
-        if (!desc) return;
+        if (!desc || !desc.trim()) return;
+
         const cat = prompt("Enter category (e.g. Work, Food, Leisure):", "General");
+        if (cat === null) return; // користувач натиснув Cancel
+
         const typeStr = prompt("Type: 1 - Income, 2 - Expense, 3 - Saved", "1");
+        if (typeStr === null) return;
+
         const amountStr = prompt("Amount (₴):", "1000");
+        if (amountStr === null) return;
 
         let type = 'income';
         if (typeStr === '2') type = 'expense';
         if (typeStr === '3') type = 'saved';
 
-        const amount = parseFloat(amountStr) || 0;
+        const amount = Math.abs(parseFloat(amountStr) || 0);
+        if (amount <= 0) {
+            alert('Сума має бути числом більшим за 0.');
+            return;
+        }
+
         const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
 
-        state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: cat.trim(), type, amount });
+        state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: (cat.trim() || 'Other'), type, amount });
         saveLocalData();
         pushFullStateToFirebase();
         renderBudget();
@@ -1620,8 +1643,24 @@
         const cleanUrl = window.location.href.split('?')[0];
         const fullSyncUrl = `${cleanUrl}?syncId=${encodeURIComponent(syncUserId)}`;
 
-        new QRCode(qrBox, { text: fullSyncUrl, width: 140, height: 140 });
+        if (typeof QRCode === 'function') {
+            try {
+                new QRCode(qrBox, { text: fullSyncUrl, width: 140, height: 140 });
+            } catch (e) {
+                qrBox.innerHTML = buildSyncLinkFallback(fullSyncUrl);
+            }
+        } else {
+            qrBox.innerHTML = buildSyncLinkFallback(fullSyncUrl);
+        }
+
         modal.style.display = 'flex';
+    }
+
+    function buildSyncLinkFallback(url) {
+        return `<div style="width:140px; padding:6px; font-size:11px; color:#333; text-align:center;">
+            QR-код недоступний (немає інтернету?). Скопіюйте посилання вручну:<br>
+            <a href="${url}" style="color:#000; word-break:break-all;">${url}</a>
+        </div>`;
     }
 
     function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
@@ -1778,7 +1817,8 @@
         mobileMot.value = state.motivation[targetDay] !== null && state.motivation[targetDay] !== undefined ? state.motivation[targetDay] : '';
 
         mobileMood.onchange = (e) => {
-            const val = e.target.value === '' ? null : parseInt(e.target.value);
+            const val = clampMoodValue(e.target.value);
+            e.target.value = val === null ? '' : val;
             state.mood[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
@@ -1786,7 +1826,8 @@
         };
 
         mobileMot.onchange = (e) => {
-            const val = e.target.value === '' ? null : parseInt(e.target.value);
+            const val = clampMoodValue(e.target.value);
+            e.target.value = val === null ? '' : val;
             state.motivation[targetDay] = val;
             saveLocalData();
             if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
@@ -1827,7 +1868,8 @@
             mInput.type = 'number'; mInput.min = '1'; mInput.max = '10'; mInput.placeholder = '-';
             mInput.value = state.mood[d] !== null && state.mood[d] !== undefined ? state.mood[d] : '';
             mInput.addEventListener('change', (e) => {
-                const val = e.target.value === '' ? null : parseInt(e.target.value);
+                const val = clampMoodValue(e.target.value);
+                e.target.value = val === null ? '' : val;
                 state.mood[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
@@ -1842,7 +1884,8 @@
             motInput.type = 'number'; motInput.min = '1'; motInput.max = '10'; motInput.placeholder = '-';
             motInput.value = state.motivation[d] !== null && state.motivation[d] !== undefined ? state.motivation[d] : '';
             motInput.addEventListener('change', (e) => {
-                const val = e.target.value === '' ? null : parseInt(e.target.value);
+                const val = clampMoodValue(e.target.value);
+                e.target.value = val === null ? '' : val;
                 state.motivation[d] = val;
                 saveLocalData();
                 if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
@@ -1902,10 +1945,28 @@
                     btn.innerText = 'Start';
                     btn.className = 'btn btn-primary';
                     playAudioAlert();
-                    alert('🎉 Focus Session Completed!');
+                    completeFocusSession();
                 }
             }, 1000);
         }
+    }
+
+    // Завершення фокус-сесії: якщо в дропдауні обрано звичку, пропонуємо
+    // одразу позначити її виконаною на сьогодні (тільки якщо перегляд
+    // припадає на поточний реальний місяць).
+    function completeFocusSession() {
+        const select = document.getElementById('timer-habit-select');
+        const hIdx = parseInt(select.value, 10);
+        const todayIdx = getTodayIndex();
+
+        if (!isNaN(hIdx) && hIdx >= 0 && state.habits[hIdx] && todayIdx !== -1) {
+            const alreadyDone = Boolean(state.checks[hIdx] && state.checks[hIdx][todayIdx]);
+            if (!alreadyDone && confirm(`🎉 Фокус-сесію завершено!\nПозначити звичку "${state.habits[hIdx]}" виконаною сьогодні?`)) {
+                toggleHabitCheck(hIdx, todayIdx, true);
+                return;
+            }
+        }
+        alert('🎉 Focus Session Completed!');
     }
 
     function resetTimer() {
@@ -2097,6 +2158,25 @@
             renderTable();
             renderMobileHabits();
             updateAll();
+        }
+    }
+
+    // Кнопка Reset відповідає лише за активну вкладку:
+    // Habits — чистить чекбокси/настрій/мотивацію, Budget — транзакції.
+    function handleResetClick() {
+        if (activeTab === 'budget') {
+            resetBudgetData();
+        } else {
+            resetMonthData();
+        }
+    }
+
+    function resetBudgetData() {
+        if (confirm("Видалити всі транзакції цього місяця? Залишок і накопичення з попередніх місяців не постраждають.")) {
+            state.budget = [];
+            saveLocalData();
+            pushFullStateToFirebase();
+            renderBudget();
         }
     }
 </script>
