@@ -712,7 +712,6 @@
             .mental-inputs-table { display: none; }
             .mobile-mental-inputs { display: flex; }
 
-            /* Mobile Budget Table Card Transformation */
             .budget-table thead {
                 display: none;
             }
@@ -969,7 +968,6 @@
                         <canvas id="categoryChart"></canvas>
                     </div>
                     <div id="category-legend-list" style="flex: 1; display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;">
-                        <!-- Dynamic Categories -->
                     </div>
                 </div>
             </div>
@@ -1020,14 +1018,12 @@
             <div class="card">
                 <div class="card-header" style="text-align: left;">Застереження та Сигнали</div>
                 <div id="burnout-warnings" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #ccc;">
-                    <!-- Динамічні застереження -->
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-header" style="text-align: left;">Поради для відновлення ресурсу</div>
                 <div class="tips-list" id="recovery-tips-list">
-                    <!-- Динамічні поради -->
                 </div>
             </div>
         </div>
@@ -1064,13 +1060,6 @@
         "Сон до 23:00 🌙"
     ];
 
-    const defaultTransactions = [
-        { date: "26 Серпня", desc: "Аванс / Основний дохід", cat: "Робота", type: "income", amount: 30000 },
-        { date: "25 Серпня", desc: "Продукти (Сільпо)", cat: "Харчування", type: "expense", amount: 6000 },
-        { date: "24 Серпня", desc: "Поповнення накопичувального банку", cat: "Спільний фонд", type: "saved", amount: 5500 },
-        { date: "22 Серпня", desc: "Кав’ярні та розваги", cat: "Відпочинок", type: "expense", amount: 6000 }
-    ];
-
     const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -1083,10 +1072,20 @@
     let daysTotal = 31;
     let activeTab = 'habits';
 
-    const urlParams = new URLSearchParams(window.location.search);
-    let syncUserId = urlParams.get('syncId') || localStorage.getItem('habitTracker_syncId') || 'user-' + Math.random().toString(36).substr(2, 6);
-    syncUserId = syncUserId.trim().replace(/[.#$\[\]/]/g, '');
-    localStorage.setItem('habitTracker_syncId', syncUserId);
+    // 1. Фіксуємо ID користувача у LocalStorage для запобігання дублювання в Firebase
+    function getOrCreateSyncUserId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let idFromUrl = urlParams.get('syncId');
+        let idFromStorage = localStorage.getItem('habitTracker_syncId');
+        
+        let finalId = idFromUrl || idFromStorage || ('user-' + Math.random().toString(36).substr(2, 6));
+        finalId = finalId.trim().replace(/[.#$\[\]/]/g, '');
+        
+        localStorage.setItem('habitTracker_syncId', finalId);
+        return finalId;
+    }
+
+    let syncUserId = getOrCreateSyncUserId();
 
     let state = {
         habits: [],
@@ -1106,7 +1105,6 @@
     let timerInterval = null;
     let isTimerRunning = false;
 
-    // Допоміжна функція розрахунку середнього значення (фільтрує null, undefined та 0)
     function calculateAverageMetric(dataArray) {
         if (!Array.isArray(dataArray)) return 0;
         const validEntries = dataArray.filter(value => value !== null && value !== undefined && value !== 0 && value !== "");
@@ -1198,6 +1196,7 @@
         calculateDaysInMonth();
         loadLocalData();
         setupFirebaseSync();
+        renderBudget();
     }
 
     function calculateDaysInMonth() {
@@ -1212,7 +1211,7 @@
         if (state.budget && typeof state.budget === 'object' && !Array.isArray(state.budget)) {
             state.budget = Object.values(state.budget);
         }
-        if (!Array.isArray(state.budget)) state.budget = [...defaultTransactions];
+        if (!Array.isArray(state.budget)) state.budget = [];
         
         state.habits.forEach((_, idx) => {
             if (!Array.isArray(state.checks[idx]) || state.checks[idx].length !== daysTotal) {
@@ -1221,7 +1220,6 @@
             }
         });
 
-        // Ініціалізація незаповнених днів значенням null замість 0 або 7
         if (!Array.isArray(state.mood) || state.mood.length !== daysTotal) {
             state.mood = Array.from({length: daysTotal}, (_, dIdx) => state.mood?.[dIdx] ?? null);
         }
@@ -1265,7 +1263,6 @@
         document.getElementById('avg-mood-val').innerText = avgMood > 0 ? `${avgMood} / 10` : "—";
         document.getElementById('avg-mot-val').innerText = avgMot > 0 ? `${avgMot} / 10` : "—";
 
-        // Загальна оцінка обчислюється тільки за наявності даних
         let overallMental = 0;
         if (avgMood > 0 && avgMot > 0) {
             overallMental = (avgMood + avgMot) / 2;
@@ -1336,7 +1333,7 @@
         }
     }
 
-    /* --- Budget Functionality & Dynamic Category Chart --- */
+    /* --- Budget Functionality (з прив'язкою до місяців) --- */
     function renderBudget() {
         const tbody = document.getElementById('budget-tbody');
         if (!tbody) return;
@@ -1346,7 +1343,14 @@
         let totalExpense = 0;
         let totalSaved = 0;
 
-        state.budget.forEach((item, index) => {
+        // Фільтрація за вибраним місяцем та роком
+        const monthTransactions = state.budget.filter(item => {
+            return (item.year === undefined || item.year === currentYear) && 
+                   (item.month === undefined || item.month === currentMonth);
+        });
+
+        monthTransactions.forEach((item) => {
+            const originalIndex = state.budget.indexOf(item);
             const tr = document.createElement('tr');
 
             let tagClass = 'tag-income';
@@ -1377,7 +1381,7 @@
                 <td data-label="Type"><span class="tag ${tagClass}">${tagText}</span></td>
                 <td data-label="Sum" style="font-weight: 700; color: ${amountColor}; text-align: right;">
                     ${amountPrefix}${item.amount.toLocaleString()} ₴
-                    <span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
+                    <span class="delete-btn" onclick="deleteTransaction(${originalIndex})">×</span>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1389,7 +1393,7 @@
         document.getElementById('b-total-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-total-expense').innerText = `-${totalExpense.toLocaleString()} ₴`;
         document.getElementById('b-total-saved').innerText = `${totalSaved.toLocaleString()} ₴`;
-        document.getElementById('b-records-count').innerText = `Total entries: ${state.budget.length}`;
+        document.getElementById('b-records-count').innerText = `Total entries: ${monthTransactions.length}`;
 
         document.getElementById('b-summary-income').innerText = `+${totalIncome.toLocaleString()} ₴`;
         document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
@@ -1404,14 +1408,14 @@
         document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
 
-        renderCategoryAnalytics();
+        renderCategoryAnalytics(monthTransactions);
     }
 
-    function renderCategoryAnalytics() {
+    function renderCategoryAnalytics(monthTransactions) {
         const categoryTotals = {};
         let totalExpenseSum = 0;
 
-        state.budget.forEach(item => {
+        monthTransactions.forEach(item => {
             if (item.type === 'expense') {
                 const cat = item.cat || 'Other';
                 categoryTotals[cat] = (categoryTotals[cat] || 0) + item.amount;
@@ -1504,7 +1508,17 @@
         const amount = parseFloat(amountStr) || 0;
         const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
 
-        state.budget.unshift({ date: dateNow, desc: desc.trim(), cat: cat.trim(), type, amount });
+        // Прив'язка запису до поточного року та місяця
+        state.budget.unshift({ 
+            date: dateNow, 
+            desc: desc.trim(), 
+            cat: cat.trim(), 
+            type, 
+            amount,
+            year: currentYear,
+            month: currentMonth
+        });
+
         saveLocalData();
         pushFullStateToFirebase();
         renderBudget();
@@ -1989,7 +2003,6 @@
             options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
         });
 
-        // Графік емоційного стану з перериванням ліній у незаповнені дні (spanGaps: false)
         const ctxMental = document.getElementById('mentalChart').getContext('2d');
         mentalChart = new Chart(ctxMental, {
             type: 'line',
