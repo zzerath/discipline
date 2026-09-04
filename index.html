@@ -1898,12 +1898,20 @@
 
     function populateTimerHabits() {
         const select = document.getElementById('timer-habit-select');
+        const previousValue = select.value; // зберігаємо поточний вибір перед перебудовою
+
         select.innerHTML = '<option value="-1">-- Select Habit --</option>';
         state.habits.forEach((h, idx) => {
             const opt = document.createElement('option');
             opt.value = idx; opt.innerText = h;
             select.appendChild(opt);
         });
+
+        // відновлюємо вибір, якщо звичка з таким індексом ще існує
+        const prevIdx = parseInt(previousValue, 10);
+        if (!isNaN(prevIdx) && prevIdx >= 0 && prevIdx < state.habits.length) {
+            select.value = previousValue;
+        }
     }
 
     function setPresetTime(minutes) {
