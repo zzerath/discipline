@@ -971,6 +971,13 @@
             </div>
         </div>
 
+        <div class="card">
+            <div class="card-header" style="text-align: left;">Динаміка за місяць</div>
+            <div class="chart-box" style="height: 160px;">
+                <canvas id="mindsetTrendChart"></canvas>
+            </div>
+        </div>
+
         <div class="mindset-grid">
             <div class="card">
                 <div class="card-header" style="text-align: left;">Застереження та Сигнали</div>
@@ -1041,7 +1048,7 @@
         budget: []
     };
 
-    let dailyChart, weeklyChart, overallChart, mentalChart, categoryChart;
+    let dailyChart, weeklyChart, overallChart, mentalChart, categoryChart, mindsetTrendChart;
     let firebaseUnsubscribe = null;
     let isRemoteUpdate = false;
 
@@ -1275,6 +1282,29 @@
     }
 
     /* --- Mindset & Recovery Tab Logic --- */
+    const LOW_MOOD_THRESHOLD = 4;
+
+    // Рахує поточну (від останнього заповненого дня назад) серію днів поспіль
+    // зі значенням <= threshold. Якщо на якомусь дні немає оцінки — серія рветься.
+    function findCurrentLowStreak(arr, threshold = LOW_MOOD_THRESHOLD) {
+        let lastFilled = -1;
+        for (let i = arr.length - 1; i >= 0; i--) {
+            if (arr[i] !== null && arr[i] !== undefined && arr[i] !== '') { lastFilled = i; break; }
+        }
+        if (lastFilled === -1) return 0;
+
+        let streak = 0;
+        for (let i = lastFilled; i >= 0; i--) {
+            const v = arr[i];
+            if (v !== null && v !== undefined && v !== '' && Number(v) <= threshold) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }
+
     function renderMindsetTab() {
         const moodArr = state.mood.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(v)).map(Number);
         const motArr = state.motivation.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(v)).map(Number);
@@ -1284,6 +1314,27 @@
 
         document.getElementById('avg-mood-val').innerText = moodArr.length ? `${avgMood} / 10` : "- / 10";
         document.getElementById('avg-mot-val').innerText = motArr.length ? `${avgMot} / 10` : "- / 10";
+
+        // Графік динаміки настрою/мотивації по днях місяця
+        if (!mindsetTrendChart) {
+            const ctx = document.getElementById('mindsetTrendChart').getContext('2d');
+            mindsetTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: daysTotal}, (_, i) => i + 1),
+                    datasets: [
+                        { label: 'Mood', data: [], borderColor: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.08)', fill: true, tension: 0.2, pointRadius: 2, spanGaps: true },
+                        { label: 'Motivation', data: [], borderColor: '#888888', borderDash: [3, 3], fill: false, tension: 0.2, pointRadius: 2, spanGaps: true }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#cccccc', boxWidth: 10, font: { size: 9 } } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888888', font: { size: 8 } } }, y: { min: 0, max: 10, grid: { color: '#2d2d2d' }, ticks: { color: '#888888', font: { size: 8 } } } } }
+            });
+        } else {
+            mindsetTrendChart.data.labels = Array.from({length: daysTotal}, (_, i) => i + 1);
+        }
+        mindsetTrendChart.data.datasets[0].data = state.mood;
+        mindsetTrendChart.data.datasets[1].data = state.motivation;
+        mindsetTrendChart.update();
 
         const statusText = document.getElementById('burnout-status-text');
         const badge = document.getElementById('burnout-badge');
@@ -1303,9 +1354,24 @@
             return;
         }
 
+        // Попередження про поточні "погані серії" — окремо від загального статусу
+        const moodStreak = findCurrentLowStreak(state.mood);
+        const motStreak = findCurrentLowStreak(state.motivation);
+        let streakWarningsHtml = '';
+        if (moodStreak >= 3) {
+            streakWarningsHtml += `<p>⚠️ <strong>Настрій</strong> нижче норми вже <strong>${moodStreak} дні поспіль</strong>. Це вже не разовий спад — варто звернути увагу.</p>`;
+        }
+        if (motStreak >= 3) {
+            streakWarningsHtml += `<p>⚠️ <strong>Мотивація</strong> нижче норми вже <strong>${motStreak} дні поспіль</strong>.</p>`;
+        }
+
         const numericMood = moodArr.length ? parseFloat(avgMood) : 7;
         const numericMot = motArr.length ? parseFloat(avgMot) : 7;
         const overallMental = (numericMood + numericMot) / 2;
+
+        // Яка саме складова просіла сильніше — впливає на набір порад
+        const diff = numericMood - numericMot;
+        const weakSpot = diff <= -1.5 ? 'mood' : (diff >= 1.5 ? 'motivation' : 'both');
 
         if (overallMental >= 7.5) {
             statusText.innerText = 'Стабільний стан (Зелена зона)';
@@ -1314,7 +1380,7 @@
             badge.style.background = 'rgba(34, 197, 94, 0.2)';
             badge.style.color = 'var(--accent-green)';
 
-            warningsBox.innerHTML = `<p>🚀 Ваші показники в нормі! Ви тримаєте хорошу дисципліну без надмірного стресу. Продовжуйте у тому ж дусі, але не забувайте про регулярні паузи.</p>`;
+            warningsBox.innerHTML = streakWarningsHtml + `<p>🚀 Ваші показники в нормі! Ви тримаєте хорошу дисципліну без надмірного стресу. Продовжуйте у тому ж дусі, але не забувайте про регулярні паузи.</p>`;
             
             tipsBox.innerHTML = `
                 <div class="tip-item"><strong>Підтримуйте баланс:</strong> Не збільшуйте навантаження різко, навіть якщо відчуваєте приплив сил.</div>
@@ -1327,13 +1393,27 @@
             badge.style.background = 'rgba(234, 179, 8, 0.2)';
             badge.style.color = 'var(--accent-yellow)';
 
-            warningsBox.innerHTML = `<p>⚠️ Ваша мотивація або настрій почали знижуватися. Це сигналізує про перші ознаки втоми. Якщо ігнорувати це, ви можете вигоріти протягом 1-2 тижнів.</p>`;
+            warningsBox.innerHTML = streakWarningsHtml + `<p>⚠️ Ваша мотивація або настрій почали знижуватися. Це сигналізує про перші ознаки втоми. Якщо ігнорувати це, ви можете вигоріти протягом 1-2 тижнів.</p>`;
 
-            tipsBox.innerHTML = `
-                <div class="tip-item"><strong>Спростіть список звичок:</strong> Залиште лише 3 найважливіші звички на день, інші зробіть опціональними.</div>
-                <div class="tip-item"><strong>Змініть обстановку:</strong> Проведіть більше часу на свіжому повітрі або змініть робоче місце.</div>
-                <div class="tip-item"><strong>Фокус на сні:</strong> Відновіть якісний сон до 23:00 — це основне джерело дофаміну.</div>
-            `;
+            if (weakSpot === 'mood') {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Просів саме настрій:</strong> справи ви ще тягнете, але емоційно важко — це радше про перевантаження, ніж про лінь.</div>
+                    <div class="tip-item"><strong>Дозвольте собі паузу без провини:</strong> 20-30 хв повністю не робочого часу щодня.</div>
+                    <div class="tip-item"><strong>Соціальний контакт:</strong> коротка розмова з близькою людиною часто піднімає настрій швидше, ніж продуктивність.</div>
+                `;
+            } else if (weakSpot === 'motivation') {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Просіла саме мотивація:</strong> настрій в нормі, але задачі відчуваються важкими або беззмістовними.</div>
+                    <div class="tip-item"><strong>Дробіть задачі:</strong> замініть "зробити звичку" на найменший можливий перший крок (1 хв, 1 сторінка тощо).</div>
+                    <div class="tip-item"><strong>Згадайте "навіщо":</strong> коротко запишіть, чому ця звичка важлива саме для вас.</div>
+                `;
+            } else {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Спростіть список звичок:</strong> Залиште лише 3 найважливіші звички на день, інші зробіть опціональними.</div>
+                    <div class="tip-item"><strong>Змініть обстановку:</strong> Проведіть більше часу на свіжому повітрі або змініть робоче місце.</div>
+                    <div class="tip-item"><strong>Фокус на сні:</strong> Відновіть якісний сон до 23:00 — це основне джерело дофаміну.</div>
+                `;
+            }
         } else {
             statusText.innerText = 'Високий ризик вигорання (Червона зона)';
             statusText.style.color = 'var(--accent-red)';
@@ -1341,13 +1421,27 @@
             badge.style.background = 'rgba(239, 68, 68, 0.2)';
             badge.style.color = 'var(--accent-red)';
 
-            warningsBox.innerHTML = `<p>🛑 Вказівка на емоційне виснаження. Самодисципліна через «не можу» зараз принесе більше шкоди, ніж користі. Потрібне негайне перезавантаження.</p>`;
+            warningsBox.innerHTML = streakWarningsHtml + `<p>🛑 Вказівка на емоційне виснаження. Самодисципліна через «не можу» зараз принесе більше шкоди, ніж користі. Потрібне негайне перезавантаження.</p>`;
 
-            tipsBox.innerHTML = `
-                <div class="tip-item"><strong>Візьміть паузу:</strong> Дозвольте собі 1-2 дні мінімальної активності без почуття провини.</div>
-                <div class="tip-item"><strong>Цифровий детокс:</strong> Вимкніть сповіщення та мінімізуйте перегляд коротких відео (TikTok, Reels).</div>
-                <div class="tip-item"><strong>Дрібні перемоги:</strong> Робіть супер-прості дії (склянка води, 5 хв розтяжки), щоб повернути відчуття контролю.</div>
-            `;
+            if (weakSpot === 'mood') {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Настрій у критичній зоні:</strong> це вже не про продуктивність — дайте собі право відпочити без почуття провини.</div>
+                    <div class="tip-item"><strong>Цифровий детокс:</strong> вимкніть сповіщення, мінімізуйте перегляд коротких відео.</div>
+                    <div class="tip-item"><strong>Підтримка:</strong> якщо стан не покращується кілька днів поспіль, варто поговорити з близькою людиною або спеціалістом.</div>
+                `;
+            } else if (weakSpot === 'motivation') {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Мотивація у критичній зоні:</strong> тимчасово знизьте планку — виконання "хоч чогось" важливіше за ідеальний список.</div>
+                    <div class="tip-item"><strong>Дрібні перемоги:</strong> оберіть 1 найлегшу звичку і сфокусуйтесь лише на ній кілька днів.</div>
+                    <div class="tip-item"><strong>Перегляньте список звичок:</strong> можливо, частина з них уже не відповідає вашим цілям.</div>
+                `;
+            } else {
+                tipsBox.innerHTML = `
+                    <div class="tip-item"><strong>Візьміть паузу:</strong> Дозвольте собі 1-2 дні мінімальної активності без почуття провини.</div>
+                    <div class="tip-item"><strong>Цифровий детокс:</strong> Вимкніть сповіщення та мінімізуйте перегляд коротких відео (TikTok, Reels).</div>
+                    <div class="tip-item"><strong>Дрібні перемоги:</strong> Робіть супер-прості дії (склянка води, 5 хв розтяжки), щоб повернути відчуття контролю.</div>
+                `;
+            }
         }
     }
 
