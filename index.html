@@ -1223,13 +1223,13 @@
         if (prevSaved) {
             try {
                 const prevData = JSON.parse(prevSaved);
-                if (Array.isArray(prevData.habits) && prevData.habits.length > 0) {
-                    inheritedHabits = [...prevData.habits];
+                if (Array.isArray(prevData.habits)) {
+                    inheritedHabits = [...prevData.habits]; // навіть порожній масив — це свідомий вибір користувача
                 }
             } catch (e) {}
         }
 
-        if (!Array.isArray(state.habits) || state.habits.length === 0) {
+        if (!Array.isArray(state.habits)) {
             state.habits = inheritedHabits;
         }
 
