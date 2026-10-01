@@ -1069,7 +1069,6 @@
     localStorage.setItem('habitTracker_syncId', syncUserId);
 
     let state = {
-        habits: [],
         checks: {},
         mood: [],
         motivation: [],
@@ -1077,8 +1076,10 @@
         budget: []
     };
 
+    let habitsList = []; // ГЛОБАЛЬНИЙ список звичок — спільний для всіх місяців
     let dailyChart, weeklyChart, overallChart, mentalChart, categoryChart, mindsetTrendChart;
     let firebaseUnsubscribe = null;
+    let habitsFirebaseUnsubscribe = null;
     let isRemoteUpdate = false;
 
     let timerDuration = 25 * 60;
@@ -1088,6 +1089,8 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         setupDateControls();
+        loadGlobalHabits();
+        setupHabitsFirebaseSync();
         loadLocalData();
         setupFirebaseSync();
         renderBudget();
@@ -1179,6 +1182,91 @@
         document.getElementById('current-month-display').innerText = `- ${monthNames[currentMonth]} ${currentYear} (${daysTotal} DAYS) -`;
     }
 
+    function generateHabitId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    // Одноразова міграція зі старого формату: раніше звички зберігались
+    // окремо в даних КОЖНОГО місяця (масив рядків). Шукаємо найсвіжіший
+    // місяць зі старим форматом і перетворюємо його список на глобальний.
+    function migrateLegacyHabitsSeed() {
+        let best = null;
+        let bestYear = -1, bestMonth = -1;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            const m = key.match(/^darkHabitTrackerState_(\d+)_(\d+)$/);
+            if (!m) continue;
+            try {
+                const data = JSON.parse(localStorage.getItem(key));
+                if (Array.isArray(data.habits) && data.habits.length && typeof data.habits[0] === 'string') {
+                    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+                    if (y > bestYear || (y === bestYear && mo > bestMonth)) {
+                        bestYear = y; bestMonth = mo; best = data.habits;
+                    }
+                }
+            } catch (e) {}
+        }
+        return best ? best.map(name => ({ id: generateHabitId(), name })) : [];
+    }
+
+    function loadGlobalHabits() {
+        const saved = localStorage.getItem('darkHabitTracker_globalHabits');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    habitsList = parsed.filter(h => h && h.id && h.name);
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        const migrated = migrateLegacyHabitsSeed();
+        habitsList = migrated.length ? migrated : defaultHabits.map(name => ({ id: generateHabitId(), name }));
+        saveGlobalHabits();
+    }
+
+    function saveGlobalHabits() {
+        localStorage.setItem('darkHabitTracker_globalHabits', JSON.stringify(habitsList));
+    }
+
+    function pushGlobalHabitsToFirebase() {
+        if (!window.db || !window.dbUpdate || !window.dbRef) return;
+        const updates = {};
+        updates[`users/${encodeURIComponent(syncUserId)}/habits`] = habitsList;
+        window.dbUpdate(window.dbRef(window.db), updates);
+    }
+
+    function setupHabitsFirebaseSync() {
+        const checkFirebase = setInterval(() => {
+            if (window.db && window.dbRef && window.dbOnValue) {
+                clearInterval(checkFirebase);
+                if (habitsFirebaseUnsubscribe) { habitsFirebaseUnsubscribe(); habitsFirebaseUnsubscribe = null; }
+
+                const habitsRef = window.dbRef(window.db, `users/${encodeURIComponent(syncUserId)}/habits`);
+                habitsFirebaseUnsubscribe = window.dbOnValue(habitsRef, (snapshot) => {
+                    const remote = snapshot.val();
+                    if (!remote) {
+                        pushGlobalHabitsToFirebase();
+                        return;
+                    }
+                    const list = Array.isArray(remote) ? remote : Object.values(remote);
+                    habitsList = list.filter(h => h && h.id && h.name);
+                    saveGlobalHabits();
+
+                    normalizeState();
+                    saveLocalData();
+                    renderTable();
+                    renderMobileHabits();
+                    updateAll();
+                }, (error) => {
+                    console.error("Habits Sync Error:", error);
+                });
+            }
+        }, 300);
+    }
+
     function getPreviousMonthKey() {
         let prevM = currentMonth - 1;
         let prevY = currentYear;
@@ -1244,29 +1332,35 @@
         return Math.min(10, Math.max(1, n));
     }
 
+    // Міграція даних КОНКРЕТНОГО місяця зі старого формату: якщо тут ще
+    // лишився старий масив рядків state.habits і чекбокси, прив'язані до
+    // числового індексу — переносимо їх під id відповідної звички з
+    // глобального списку (зіставлення за назвою), і прибираємо старе поле.
+    function migrateLegacyChecksForMonth() {
+        if (!Array.isArray(state.habits) || !state.habits.length) return;
+
+        const nameToId = {};
+        habitsList.forEach(h => { nameToId[h.name.trim().toLowerCase()] = h.id; });
+
+        state.habits.forEach((name, oldIdx) => {
+            const id = nameToId[String(name).trim().toLowerCase()];
+            const oldData = state.checks ? state.checks[oldIdx] : null;
+            if (id && Array.isArray(oldData)) {
+                state.checks[id] = oldData;
+            }
+        });
+
+        delete state.habits; // звички більше не зберігаються в даних місяця
+    }
+
     function normalizeState() {
-        const prevKey = getPreviousMonthKey();
-        const prevSaved = localStorage.getItem(prevKey);
-        let inheritedHabits = [...defaultHabits];
-
-        if (prevSaved) {
-            try {
-                const prevData = JSON.parse(prevSaved);
-                if (Array.isArray(prevData.habits)) {
-                    inheritedHabits = [...prevData.habits]; // навіть порожній масив — це свідомий вибір користувача
-                }
-            } catch (e) {}
-        }
-
-        if (!Array.isArray(state.habits)) {
-            state.habits = inheritedHabits;
-        }
-
         if (!state.checks || typeof state.checks !== 'object') state.checks = {};
-        
-        state.habits.forEach((_, idx) => {
-            if (!Array.isArray(state.checks[idx]) || state.checks[idx].length !== daysTotal) {
-                state.checks[idx] = Array.from({length: daysTotal}, () => false);
+
+        migrateLegacyChecksForMonth();
+
+        habitsList.forEach(h => {
+            if (!Array.isArray(state.checks[h.id]) || state.checks[h.id].length !== daysTotal) {
+                state.checks[h.id] = Array.from({length: daysTotal}, () => false);
             }
         });
 
@@ -1729,6 +1823,7 @@
 
                     isRemoteUpdate = true;
                     try {
+                        const hadLegacyHabits = Array.isArray(remoteData.habits);
                         state = {
                             ...state,
                             ...remoteData,
@@ -1738,6 +1833,7 @@
                         };
                         normalizeState();
                         saveLocalData();
+                        if (hadLegacyHabits) pushFullStateToFirebase(); // прибираємо застаріле поле habits з цього вузла
 
                         renderTable();
                         renderMobileHabits();
@@ -1812,6 +1908,7 @@
         if (input && input.value.trim()) {
             syncUserId = input.value.trim().replace(/[.#$\[\]/]/g, '');
             localStorage.setItem('habitTracker_syncId', syncUserId);
+            setupHabitsFirebaseSync();
             setupFirebaseSync();
             closeSyncModal();
         }
@@ -1878,15 +1975,15 @@
         const tbody = document.getElementById('habits-tbody');
         tbody.innerHTML = '';
 
-        state.habits.forEach((habit, hIdx) => {
+        habitsList.forEach(h => {
             const tr = document.createElement('tr');
 
             const nameTd = document.createElement('td');
             nameTd.className = 'habit-title-col';
-            nameTd.innerHTML = `<span>${habit}</span><span class="delete-btn" onclick="deleteHabit(${hIdx})">×</span>`;
+            nameTd.innerHTML = `<span>${h.name}</span><span class="delete-btn" onclick="deleteHabit('${h.id}')">×</span>`;
             tr.appendChild(nameTd);
 
-            if (!state.checks[hIdx]) state.checks[hIdx] = Array(daysTotal).fill(false);
+            if (!state.checks[h.id]) state.checks[h.id] = Array(daysTotal).fill(false);
 
             for (let d = 0; d < daysTotal; d++) {
                 const date = new Date(currentYear, currentMonth, d + 1);
@@ -1899,20 +1996,20 @@
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.checked = Boolean(state.checks[hIdx][d]);
+                checkbox.checked = Boolean(state.checks[h.id][d]);
                 checkbox.addEventListener('change', (e) => {
-                    toggleHabitCheck(hIdx, d, e.target.checked);
+                    toggleHabitCheck(h.id, d, e.target.checked);
                 });
                 td.appendChild(checkbox);
                 tr.appendChild(td);
             }
 
-            const goalTd = document.createElement('td'); goalTd.id = `goal-${hIdx}`;
-            const achievTd = document.createElement('td'); achievTd.id = `achiev-${hIdx}`;
-            const leftTd = document.createElement('td'); leftTd.id = `left-${hIdx}`;
+            const goalTd = document.createElement('td'); goalTd.id = `goal-${h.id}`;
+            const achievTd = document.createElement('td'); achievTd.id = `achiev-${h.id}`;
+            const leftTd = document.createElement('td'); leftTd.id = `left-${h.id}`;
             const progressTd = document.createElement('td');
-            progressTd.innerHTML = `<div class="progress-bar-outer"><div class="progress-bar-inner" id="pbar-${hIdx}"></div></div>`;
-            const pctTd = document.createElement('td'); pctTd.id = `pct-${hIdx}`;
+            progressTd.innerHTML = `<div class="progress-bar-outer"><div class="progress-bar-inner" id="pbar-${h.id}"></div></div>`;
+            const pctTd = document.createElement('td'); pctTd.id = `pct-${h.id}`;
             pctTd.style.fontWeight = '700';
 
             tr.appendChild(goalTd); tr.appendChild(achievTd); tr.appendChild(leftTd);
@@ -1932,19 +2029,19 @@
         const todayIdx = getTodayIndex();
         const targetDay = todayIdx !== -1 ? todayIdx : 0;
 
-        state.habits.forEach((habit, hIdx) => {
+        habitsList.forEach(h => {
             const card = document.createElement('div');
             card.className = 'mobile-habit-card';
 
             const title = document.createElement('span');
             title.className = 'mobile-habit-title';
-            title.innerText = habit;
+            title.innerText = h.name;
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.checked = Boolean(state.checks[hIdx]?.[targetDay]);
+            checkbox.checked = Boolean(state.checks[h.id]?.[targetDay]);
             checkbox.addEventListener('change', (e) => {
-                toggleHabitCheck(hIdx, targetDay, e.target.checked);
+                toggleHabitCheck(h.id, targetDay, e.target.checked);
             });
 
             card.appendChild(title);
@@ -1977,13 +2074,13 @@
         };
     }
 
-    function toggleHabitCheck(hIdx, dayIdx, isChecked) {
-        if (!state.checks[hIdx]) state.checks[hIdx] = Array(daysTotal).fill(false);
-        state.checks[hIdx][dayIdx] = isChecked;
+    function toggleHabitCheck(habitId, dayIdx, isChecked) {
+        if (!state.checks[habitId]) state.checks[habitId] = Array(daysTotal).fill(false);
+        state.checks[habitId][dayIdx] = isChecked;
         saveLocalData();
 
         if (!isRemoteUpdate) {
-            updateRemoteField(`checks/${hIdx}/${dayIdx}`, isChecked);
+            updateRemoteField(`checks/${habitId}/${dayIdx}`, isChecked);
         }
 
         renderTable();
@@ -2043,15 +2140,14 @@
         const previousValue = select.value; // зберігаємо поточний вибір перед перебудовою
 
         select.innerHTML = '<option value="-1">-- Select Habit --</option>';
-        state.habits.forEach((h, idx) => {
+        habitsList.forEach(h => {
             const opt = document.createElement('option');
-            opt.value = idx; opt.innerText = h;
+            opt.value = h.id; opt.innerText = h.name;
             select.appendChild(opt);
         });
 
-        // відновлюємо вибір, якщо звичка з таким індексом ще існує
-        const prevIdx = parseInt(previousValue, 10);
-        if (!isNaN(prevIdx) && prevIdx >= 0 && prevIdx < state.habits.length) {
+        // відновлюємо вибір, якщо звичка з таким id ще існує
+        if (habitsList.some(h => h.id === previousValue)) {
             select.value = previousValue;
         }
     }
@@ -2106,13 +2202,14 @@
     // припадає на поточний реальний місяць).
     function completeFocusSession() {
         const select = document.getElementById('timer-habit-select');
-        const hIdx = parseInt(select.value, 10);
+        const habitId = select.value;
+        const habit = habitsList.find(h => h.id === habitId);
         const todayIdx = getTodayIndex();
 
-        if (!isNaN(hIdx) && hIdx >= 0 && state.habits[hIdx] && todayIdx !== -1) {
-            const alreadyDone = Boolean(state.checks[hIdx] && state.checks[hIdx][todayIdx]);
-            if (!alreadyDone && confirm(`🎉 Фокус-сесію завершено!\nПозначити звичку "${state.habits[hIdx]}" виконаною сьогодні?`)) {
-                toggleHabitCheck(hIdx, todayIdx, true);
+        if (habit && todayIdx !== -1) {
+            const alreadyDone = Boolean(state.checks[habitId] && state.checks[habitId][todayIdx]);
+            if (!alreadyDone && confirm(`🎉 Фокус-сесію завершено!\nПозначити звичку "${habit.name}" виконаною сьогодні?`)) {
+                toggleHabitCheck(habitId, todayIdx, true);
                 return;
             }
         }
@@ -2154,13 +2251,13 @@
     }
 
     function updateAll() {
-        let totalPossible = state.habits.length * daysTotal;
+        let totalPossible = habitsList.length * daysTotal;
         let totalCompleted = 0;
         const dailyCounts = Array(daysTotal).fill(0);
         const habitStats = [];
 
-        state.habits.forEach((habit, hIdx) => {
-            const checks = state.checks[hIdx] || Array(daysTotal).fill(false);
+        habitsList.forEach(h => {
+            const checks = state.checks[h.id] || Array(daysTotal).fill(false);
             const completed = checks.filter(Boolean).length;
             const goal = daysTotal;
             const left = goal - completed;
@@ -2168,19 +2265,19 @@
 
             totalCompleted += completed;
 
-            if (document.getElementById(`goal-${hIdx}`)) {
-                document.getElementById(`goal-${hIdx}`).innerText = goal;
-                document.getElementById(`achiev-${hIdx}`).innerText = completed;
-                document.getElementById(`left-${hIdx}`).innerText = left;
-                document.getElementById(`pct-${hIdx}`).innerText = `${pct}%`;
-                document.getElementById(`pbar-${hIdx}`).style.width = `${pct}%`;
+            if (document.getElementById(`goal-${h.id}`)) {
+                document.getElementById(`goal-${h.id}`).innerText = goal;
+                document.getElementById(`achiev-${h.id}`).innerText = completed;
+                document.getElementById(`left-${h.id}`).innerText = left;
+                document.getElementById(`pct-${h.id}`).innerText = `${pct}%`;
+                document.getElementById(`pbar-${h.id}`).style.width = `${pct}%`;
             }
 
             checks.forEach((chk, dIdx) => {
                 if (chk) dailyCounts[dIdx]++;
             });
 
-            habitStats.push({ name: habit, completed, pct });
+            habitStats.push({ name: h.name, completed, pct });
         });
 
         const totalLeft = totalPossible - totalCompleted;
@@ -2266,32 +2363,34 @@
     function addHabitPrompt() {
         const name = prompt("Enter new habit name:");
         if (name && name.trim()) {
-            state.habits.push(name.trim());
-            state.checks[state.habits.length - 1] = Array(daysTotal).fill(false);
+            const newHabit = { id: generateHabitId(), name: name.trim() };
+            habitsList.push(newHabit);
+            saveGlobalHabits();
+            pushGlobalHabitsToFirebase();
+
+            state.checks[newHabit.id] = Array(daysTotal).fill(false);
             saveLocalData();
             pushFullStateToFirebase();
+
             renderTable();
             renderMobileHabits();
             updateAll();
         }
     }
 
-    function deleteHabit(index) {
-        if (confirm(`Delete habit "${state.habits[index]}"?`)) {
-            const oldChecks = state.checks;
-            const oldLength = state.habits.length;
-            state.habits.splice(index, 1);
+    function deleteHabit(habitId) {
+        const habit = habitsList.find(h => h.id === habitId);
+        if (!habit) return;
 
-            const newChecks = {};
-            let newIdx = 0;
-            for (let oldIdx = 0; oldIdx < oldLength; oldIdx++) {
-                if (oldIdx === index) continue; // пропускаємо видалену звичку
-                newChecks[newIdx] = oldChecks[oldIdx] || Array(daysTotal).fill(false);
-                newIdx++;
-            }
-            state.checks = newChecks;
+        if (confirm(`Delete habit "${habit.name}"? Вона зникне з усіх місяців.`)) {
+            habitsList = habitsList.filter(h => h.id !== habitId);
+            saveGlobalHabits();
+            pushGlobalHabitsToFirebase();
+
+            delete state.checks[habitId];
             saveLocalData();
             pushFullStateToFirebase();
+
             renderTable();
             renderMobileHabits();
             updateAll();
@@ -2300,7 +2399,7 @@
 
     function resetMonthData() {
         if (confirm("Reset all marks for this month?")) {
-            state.habits.forEach((_, i) => { state.checks[i] = Array(daysTotal).fill(false); });
+            habitsList.forEach(h => { state.checks[h.id] = Array(daysTotal).fill(false); });
             state.mood = Array(daysTotal).fill(null);
             state.motivation = Array(daysTotal).fill(null);
             saveLocalData();
