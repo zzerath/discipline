@@ -1255,6 +1255,9 @@
         const migrated = migrateLegacyHabitsSeed();
         habitsList = (migrated.length ? migrated : defaultHabits.map(name => ({ id: generateHabitId(), name }))).map(normalizeHabitRecord);
         saveGlobalHabits();
+        // Це автоматичний "сід", а не дія користувача: мітка часу 0 гарантує,
+        // що будь-які реальні дані з сервера завжди виграють у такого списку.
+        localStorage.setItem('darkHabitTracker_globalHabitsUpdatedAt', '0');
     }
 
     function saveGlobalHabits() {
