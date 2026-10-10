@@ -16,7 +16,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             databaseURL: "https://my-habit-tracker-1eaf1-default-rtdb.europe-west1.firebasedatabase.app/"
@@ -29,6 +29,7 @@
         window.dbRef = ref;
         window.dbOnValue = onValue;
         window.dbUpdate = update;
+        window.dbGet = get;
     </script>
 
     <style>
@@ -163,6 +164,8 @@
             font-weight: 500;
             outline: none;
         }
+
+        body.is-loading .view-section { opacity: 0.45; pointer-events: none; }
 
         .view-section {
             display: flex;
@@ -504,6 +507,17 @@
             margin-left: 6px;
             font-weight: bold;
         }
+
+        .edit-btn {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            color: #666;
+            cursor: pointer;
+            margin-left: 6px;
+            padding: 4px;
+        }
+        .edit-btn:hover { color: #ffffff; }
 
         .widget-title {
             font-size: 0.75rem;
@@ -1009,6 +1023,7 @@
             <button class="btn btn-primary" style="flex: 1;" onclick="applySyncId()">Save & Connect</button>
             <button class="btn" style="flex: 1;" onclick="closeSyncModal()">Close</button>
         </div>
+        <button class="btn" style="width: 100%;" onclick="exportBackup()">Download backup (JSON)</button>
     </div>
 </div>
 
@@ -1078,9 +1093,16 @@
 
     let habitsList = []; // ГЛОБАЛЬНИЙ список звичок — спільний для всіх місяців
     let dailyChart, weeklyChart, overallChart, mentalChart, categoryChart, mindsetTrendChart;
+    // Firebase — ЄДИНЕ джерело правди. У localStorage лишаються тільки
+    // sync ID та останній обраний місяць (налаштування інтерфейсу).
     let firebaseUnsubscribe = null;
     let habitsFirebaseUnsubscribe = null;
-    let isRemoteUpdate = false;
+    let prevMonthUnsubscribe = null;
+    let habitsLoaded = false;   // список звичок отримано з сервера
+    let monthLoaded = false;    // дані поточного місяця отримано з сервера
+    let prevMonthLoaded = false;
+    let prevMonthBudget = [];   // бюджет попереднього місяця (для переносу залишку)
+    let pendingWrites = 0;      // кількість записів, які ще не підтверджені сервером
 
     let timerDuration = 25 * 60;
     let timerTimeLeft = timerDuration;
@@ -1089,11 +1111,13 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         setupDateControls();
-        loadGlobalHabits();
-        setupHabitsFirebaseSync();
-        loadLocalData();
-        setupFirebaseSync();
-        renderBudget();
+        subscribeConnectionStatus();
+        subscribeHabits();
+        loadMonthData();
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (pendingWrites > 0) { e.preventDefault(); e.returnValue = ''; }
     });
 
     function switchTab(tab) {
@@ -1172,9 +1196,7 @@
         localStorage.setItem('habitTracker_lastYear', currentYear);
         localStorage.setItem('habitTracker_lastMonth', currentMonth);
 
-        calculateDaysInMonth();
-        loadLocalData();
-        setupFirebaseSync();
+        loadMonthData();
     }
 
     function calculateDaysInMonth() {
@@ -1182,13 +1204,18 @@
         document.getElementById('current-month-display').innerText = `- ${monthNames[currentMonth]} ${currentYear} (${daysTotal} DAYS) -`;
     }
 
+    // Текст, введений користувачем (назви звичок, опис транзакцій), не повинен
+    // інтерпретуватись як HTML — інакше символи < > & ламають таблиці.
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    const PENCIL_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
+
     function generateHabitId() {
         return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     }
 
-    // Одноразова міграція зі старого формату: раніше звички зберігались
-    // окремо в даних КОЖНОГО місяця (масив рядків). Шукаємо найсвіжіший
-    // місяць зі старим форматом і перетворюємо його список на глобальний.
     // Порівнюваний "номер" місяця (рік*12+місяць) — щоб коректно порівнювати
     // "раніше/пізніше" без проблем лексикографічного порівняння рядків.
     function monthKey(year, month) {
@@ -1208,27 +1235,6 @@
         });
     }
 
-    function migrateLegacyHabitsSeed() {
-        let best = null;
-        let bestYear = -1, bestMonth = -1;
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key) continue;
-            const m = key.match(/^darkHabitTrackerState_(\d+)_(\d+)$/);
-            if (!m) continue;
-            try {
-                const data = JSON.parse(localStorage.getItem(key));
-                if (Array.isArray(data.habits) && data.habits.length && typeof data.habits[0] === 'string') {
-                    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
-                    if (y > bestYear || (y === bestYear && mo > bestMonth)) {
-                        bestYear = y; bestMonth = mo; best = data.habits;
-                    }
-                }
-            } catch (e) {}
-        }
-        return best ? best.map(name => ({ id: generateHabitId(), name })) : [];
-    }
-
     // Доповнює звичку полями addedAt/removedAt, якщо їх ще нема (старі
     // записи до введення часової моделі — вважаємо, що такі "діяли завжди").
     function normalizeHabitRecord(h) {
@@ -1240,128 +1246,51 @@
         };
     }
 
-    function loadGlobalHabits() {
-        const saved = localStorage.getItem('darkHabitTracker_globalHabits');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                    habitsList = parsed.filter(h => h && h.id && h.name).map(normalizeHabitRecord);
-                    return;
+    // ===== Звички: читаємо та пишемо ТІЛЬКИ через Firebase =====
+    function writeHabits() {
+        writeRemote({ [userPath('habits')]: { updatedAt: Date.now(), list: habitsList } });
+    }
+
+    function subscribeHabits() {
+        waitForFirebase(() => {
+            if (habitsFirebaseUnsubscribe) { habitsFirebaseUnsubscribe(); habitsFirebaseUnsubscribe = null; }
+            habitsLoaded = false;
+
+            habitsFirebaseUnsubscribe = window.dbOnValue(window.dbRef(window.db, userPath('habits')), (snapshot) => {
+                const remote = snapshot.val();
+                if (remote === null) {
+                    // Сервер підтвердив, що для цього sync ID звичок ще немає —
+                    // єдине місце, де створюється стандартний список.
+                    habitsList = defaultHabits.map(name => normalizeHabitRecord({ id: generateHabitId(), name }));
+                    habitsLoaded = true;
+                    writeHabits();
+                } else {
+                    const isWrapped = typeof remote === 'object' && !Array.isArray(remote) && remote.list !== undefined;
+                    const raw = isWrapped ? remote.list : remote;
+                    const list = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+                    habitsList = list.filter(h => h && h.id && h.name).map(normalizeHabitRecord);
+                    habitsLoaded = true;
                 }
-            } catch (e) {}
-        }
-
-        const migrated = migrateLegacyHabitsSeed();
-        habitsList = (migrated.length ? migrated : defaultHabits.map(name => ({ id: generateHabitId(), name }))).map(normalizeHabitRecord);
-        saveGlobalHabits();
-        // Це автоматичний "сід", а не дія користувача: мітка часу 0 гарантує,
-        // що будь-які реальні дані з сервера завжди виграють у такого списку.
-        localStorage.setItem('darkHabitTracker_globalHabitsUpdatedAt', '0');
+                refreshUI();
+            }, (error) => {
+                console.error('Habits sync error:', error);
+                setSyncStatus('⚠ Offline', '#909399');
+            });
+        });
     }
 
-    function saveGlobalHabits() {
-        localStorage.setItem('darkHabitTracker_globalHabits', JSON.stringify(habitsList));
-        localStorage.setItem('darkHabitTracker_globalHabitsUpdatedAt', String(Date.now()));
-    }
-
-    function getGlobalHabitsLocalTimestamp() {
-        return parseInt(localStorage.getItem('darkHabitTracker_globalHabitsUpdatedAt') || '0', 10);
-    }
-
-    function pushGlobalHabitsToFirebase() {
-        if (!window.db || !window.dbUpdate || !window.dbRef) return;
-        try {
-            const updates = {};
-            updates[`users/${encodeURIComponent(syncUserId)}/habits`] = {
-                updatedAt: getGlobalHabitsLocalTimestamp() || Date.now(),
-                list: habitsList
-            };
-            window.dbUpdate(window.dbRef(window.db), updates).catch(err => console.error('Habits push error:', err));
-        } catch (err) {
-            // Firebase SDK може кинути синхронну помилку на невалідних даних —
-            // ніколи не даємо цьому обірвати функцію, що викликала пуш.
-            console.error('Habits push error:', err);
-        }
-    }
-
-    function setupHabitsFirebaseSync() {
-        const checkFirebase = setInterval(() => {
-            if (window.db && window.dbRef && window.dbOnValue) {
-                clearInterval(checkFirebase);
-                if (habitsFirebaseUnsubscribe) { habitsFirebaseUnsubscribe(); habitsFirebaseUnsubscribe = null; }
-
-                const habitsRef = window.dbRef(window.db, `users/${encodeURIComponent(syncUserId)}/habits`);
-                habitsFirebaseUnsubscribe = window.dbOnValue(habitsRef, (snapshot) => {
-                    const remote = snapshot.val();
-                    if (!remote) {
-                        pushGlobalHabitsToFirebase();
-                        return;
-                    }
-
-                    // Сумісність зі старим форматом (без мітки часу) — такі дані
-                    // вважаються найстарішими з можливих.
-                    const isWrapped = typeof remote === 'object' && !Array.isArray(remote) && remote.list;
-                    const remoteUpdatedAt = isWrapped ? (remote.updatedAt || 0) : 0;
-                    const remoteList = isWrapped ? remote.list : (Array.isArray(remote) ? remote : Object.values(remote));
-                    const localUpdatedAt = getGlobalHabitsLocalTimestamp();
-
-                    if (localUpdatedAt > remoteUpdatedAt) {
-                        // Локальні дані свіжіші за сервер (попередній запис, схоже,
-                        // не встиг долетіти) — не даємо застарілим даним перезаписати
-                        // локальні, натомість наздоганяємо сервер актуальними.
-                        pushGlobalHabitsToFirebase();
-                        return;
-                    }
-
-                    habitsList = (Array.isArray(remoteList) ? remoteList : []).filter(h => h && h.id && h.name).map(normalizeHabitRecord);
-                    localStorage.setItem('darkHabitTracker_globalHabits', JSON.stringify(habitsList));
-                    localStorage.setItem('darkHabitTracker_globalHabitsUpdatedAt', String(remoteUpdatedAt || Date.now()));
-
-                    normalizeState();
-                    saveLocalData();
-                    renderTable();
-                    renderMobileHabits();
-                    updateAll();
-                }, (error) => {
-                    console.error("Habits Sync Error:", error);
-                });
-            }
-        }, 300);
-    }
-
-    function getPreviousMonthKey() {
-        let prevM = currentMonth - 1;
-        let prevY = currentYear;
-        if (prevM < 0) {
-            prevM = 11;
-            prevY -= 1;
-        }
-        return `darkHabitTrackerState_${prevY}_${prevM}`;
-    }
-
+    // Залишок і накопичення попереднього місяця рахуємо з даних Firebase
+    // (prevMonthBudget оновлюється окремою підпискою в loadMonthData).
     function calculatePreviousMonthTotals() {
-        const prevKey = getPreviousMonthKey();
-        const prevSaved = localStorage.getItem(prevKey);
-        let carryOverBalance = 0;
-        let carryOverSaved = 0;
-
-        if (prevSaved) {
-            try {
-                const prevData = JSON.parse(prevSaved);
-                const prevBudget = Array.isArray(prevData.budget) ? prevData.budget : (prevData.budget ? Object.values(prevData.budget) : []);
-                
-                let inc = 0, exp = 0, sav = 0;
-                prevBudget.forEach(item => {
-                    if (item.type === 'expense') exp += item.amount;
-                    else if (item.type === 'saved') sav += item.amount;
-                    else inc += item.amount;
-                });
-                carryOverBalance = inc - exp - sav;
-                carryOverSaved = sav;
-            } catch (e) {}
-        }
-        return { carryOverBalance, carryOverSaved };
+        let inc = 0, exp = 0, sav = 0;
+        prevMonthBudget.forEach(item => {
+            if (!item) return;
+            const amount = Number(item.amount) || 0;
+            if (item.type === 'expense') exp += amount;
+            else if (item.type === 'saved') sav += amount;
+            else inc += amount;
+        });
+        return { carryOverBalance: inc - exp - sav, carryOverSaved: sav };
     }
 
     // Firebase видаляє ключі зі значенням null, тому масив із пропущеними
@@ -1408,7 +1337,9 @@
         state.habits.forEach((name, oldIdx) => {
             const id = nameToId[String(name).trim().toLowerCase()];
             const oldData = state.checks ? state.checks[oldIdx] : null;
-            if (id && Array.isArray(oldData)) {
+            const cur = state.checks[id];
+            const curHasMarks = cur && typeof cur === 'object' && Object.values(cur).some(Boolean);
+            if (id && Array.isArray(oldData) && !curHasMarks) {
                 state.checks[id] = oldData;
             }
         });
@@ -1421,10 +1352,10 @@
 
         migrateLegacyChecksForMonth();
 
+        // Firebase може повернути масив відміток як розріджений об'єкт
+        // (збережено лише окремі дні) — відновлюємо повний масив по днях.
         getVisibleHabits().forEach(h => {
-            if (!Array.isArray(state.checks[h.id]) || state.checks[h.id].length !== daysTotal) {
-                state.checks[h.id] = Array.from({length: daysTotal}, () => false);
-            }
+            state.checks[h.id] = toIndexedArray(state.checks[h.id], daysTotal, false);
         });
 
         state.mood = toIndexedArray(state.mood, daysTotal, null);
@@ -1438,22 +1369,20 @@
         }
     }
 
-    function loadLocalData() {
-        calculateDaysInMonth();
-        const saved = localStorage.getItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`);
-        if (saved) {
-            try { state = JSON.parse(saved); } catch (e) { state = {}; }
-        } else {
-            state = {};
-        }
-        normalizeState();
+    function applyTimerFromState() {
+        if (isTimerRunning || !state.savedTimerMins) return;
+        if (timerDuration === state.savedTimerMins * 60) return;
+        timerDuration = state.savedTimerMins * 60;
+        timerTimeLeft = timerDuration;
+        document.getElementById('timer-custom-input').value = state.savedTimerMins;
+        updateTimerDisplay();
+    }
 
-        if (state.savedTimerMins) {
-            timerDuration = state.savedTimerMins * 60;
-            timerTimeLeft = timerDuration;
-            document.getElementById('timer-custom-input').value = state.savedTimerMins;
-            updateTimerDisplay();
-        }
+    // Малюємо інтерфейс лише коли отримані І звички, І дані місяця з сервера.
+    function refreshUI() {
+        if (!habitsLoaded || !monthLoaded) return;
+        normalizeState();
+        applyTimerFromState();
 
         renderHeaderRow();
         renderTable();
@@ -1461,10 +1390,10 @@
         if (!dailyChart) initCharts();
         updateAll();
         renderBudget();
-    }
+        if (activeTab === 'mindset') renderMindsetTab();
 
-    function saveLocalData() {
-        localStorage.setItem(`darkHabitTrackerState_${currentYear}_${currentMonth}`, JSON.stringify(state));
+        document.body.classList.remove('is-loading');
+        if (pendingWrites === 0) setSyncStatus('☁ Synced', '#67c23a');
     }
 
     /* --- Mindset & Recovery Tab Logic --- */
@@ -1633,8 +1562,10 @@
 
     /* --- Budget Functionality --- */
     function renderBudget() {
+        if (!monthLoaded || !prevMonthLoaded) return;
         const tbody = document.getElementById('budget-tbody');
         if (!tbody) return;
+        if (!monthLoaded || !prevMonthLoaded) return; // чекаємо дані з сервера
         tbody.innerHTML = '';
 
         const { carryOverBalance, carryOverSaved } = calculatePreviousMonthTotals();
@@ -1685,8 +1616,8 @@
 
             tr.innerHTML = `
                 <td data-label="Date">${item.date}</td>
-                <td data-label="Description">${item.desc}</td>
-                <td data-label="Category">${item.cat}</td>
+                <td data-label="Description">${escapeHtml(item.desc)}</td>
+                <td data-label="Category">${escapeHtml(item.cat)}</td>
                 <td data-label="Type"><span class="tag ${tagClass}">${tagText}</span></td>
                 <td data-label="Sum" style="font-weight: 700; color: ${amountColor}; text-align: right;">
                     ${amountPrefix}${item.amount.toLocaleString()} ₴
@@ -1806,6 +1737,7 @@
     let selectedTxType = 'income';
 
     function openTransactionModal() {
+        if (!guardReady()) return;
         document.getElementById('tx-desc-input').value = '';
         document.getElementById('tx-cat-input').value = '';
         document.getElementById('tx-amount-input').value = '';
@@ -1846,18 +1778,18 @@
 
         const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
 
+        if (!guardReady()) return;
         state.budget.unshift({ date: dateNow, desc, cat: (cat || 'Other'), type: selectedTxType, amount });
-        saveLocalData();
-        pushFullStateToFirebase();
+        writeBudget();
         renderBudget();
         closeTransactionModal();
     }
 
     function deleteTransaction(index) {
+        if (!guardReady()) return;
         if (confirm("Delete this budget entry?")) {
             state.budget.splice(index, 1);
-            saveLocalData();
-            pushFullStateToFirebase();
+            writeBudget();
             renderBudget();
         }
     }
@@ -1868,79 +1800,142 @@
         if (el) { el.innerText = text; el.style.color = color; }
     }
 
-    function setupFirebaseSync() {
-        const checkFirebase = setInterval(() => {
-            if (window.db && window.dbRef && window.dbOnValue) {
-                clearInterval(checkFirebase);
-                if (firebaseUnsubscribe) { firebaseUnsubscribe(); firebaseUnsubscribe = null; }
-
-                setSyncStatus('☁ Connecting...', '#e6a23c');
-                const userRef = window.dbRef(window.db, `users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}`);
-                
-                firebaseUnsubscribe = window.dbOnValue(userRef, (snapshot) => {
-                    const remoteData = snapshot.val();
-                    if (!remoteData) {
-                        pushFullStateToFirebase();
-                        return;
-                    }
-
-                    isRemoteUpdate = true;
-                    try {
-                        const hadLegacyHabits = Array.isArray(remoteData.habits);
-                        state = {
-                            ...state,
-                            ...remoteData,
-                            budget: remoteData.budget 
-                                ? (Array.isArray(remoteData.budget) ? remoteData.budget : Object.values(remoteData.budget)) 
-                                : []
-                        };
-                        normalizeState();
-                        saveLocalData();
-                        if (hadLegacyHabits) pushFullStateToFirebase(); // прибираємо застаріле поле habits з цього вузла
-
-                        renderTable();
-                        renderMobileHabits();
-                        updateAll();
-                        renderBudget();
-                        if (activeTab === 'mindset') renderMindsetTab();
-                        setSyncStatus('☁ Synced', '#67c23a');
-                    } finally {
-                        isRemoteUpdate = false;
-                    }
-                }, (error) => {
-                    console.error("Firebase Sync Error:", error);
-                    setSyncStatus('⚠ Offline', '#909399');
-                });
-            }
-        }, 300);
+    function userPath(sub) {
+        return `users/${encodeURIComponent(syncUserId)}` + (sub ? `/${sub}` : '');
     }
 
-    function updateRemoteField(path, value) {
-        if (!window.db || !window.dbUpdate || !window.dbRef) return;
+    function monthPath(sub) {
+        return userPath(`${currentYear}_${currentMonth}` + (sub ? `/${sub}` : ''));
+    }
+
+    function isDataReady() { return habitsLoaded && monthLoaded; }
+
+    // Поки дані не завантажились із сервера — нічого не пишемо, щоб
+    // порожній стан ніколи не перезаписав справжні дані.
+    function guardReady() {
+        if (isDataReady()) return true;
+        alert('Дані ще завантажуються з сервера. Зачекай секунду і повтори.');
+        return false;
+    }
+
+    function waitForFirebase(callback) {
+        const timer = setInterval(() => {
+            if (window.db && window.dbRef && window.dbOnValue && window.dbUpdate) {
+                clearInterval(timer);
+                callback();
+            }
+        }, 200);
+    }
+
+    // Єдина точка запису в Firebase: updates = { 'повний/шлях': значення }
+    function writeRemote(updates) {
+        if (!window.db || !window.dbUpdate || !window.dbRef) {
+            setSyncStatus('⚠ Offline', '#909399');
+            return;
+        }
+        pendingWrites++;
+        setSyncStatus('☁ Saving...', '#e6a23c');
+        const done = (ok) => {
+            pendingWrites = Math.max(0, pendingWrites - 1);
+            if (!ok) setSyncStatus('⚠ Error', '#f56c6c');
+            else if (pendingWrites === 0) setSyncStatus('☁ Synced', '#67c23a');
+        };
         try {
-            setSyncStatus('☁ Saving...', '#e6a23c');
-            const updates = {};
-            updates[`users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}/${path}`] = value;
             window.dbUpdate(window.dbRef(window.db), updates)
-                .then(() => setSyncStatus('☁ Synced', '#67c23a'))
-                .catch(() => setSyncStatus('⚠ Error', '#f56c6c'));
+                .then(() => done(true))
+                .catch(err => { console.error('Firebase write error:', err); done(false); });
         } catch (err) {
-            console.error('Remote field update error:', err);
-            setSyncStatus('⚠ Error', '#f56c6c');
+            console.error('Firebase write error:', err);
+            done(false);
         }
     }
 
-    function pushFullStateToFirebase() {
-        if (!window.db || !window.dbUpdate || !window.dbRef) return;
+    function writeMonthField(sub, value) { writeRemote({ [monthPath(sub)]: value }); }
+    function writeBudget() { writeMonthField('budget', state.budget.length ? state.budget : null); }
+
+    function toArrayLoose(v) {
+        return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+    }
+
+    function subscribeConnectionStatus() {
+        waitForFirebase(() => {
+            window.dbOnValue(window.dbRef(window.db, '.info/connected'), (snap) => {
+                if (snap.val() === true) {
+                    if (pendingWrites === 0 && isDataReady()) setSyncStatus('☁ Synced', '#67c23a');
+                } else {
+                    setSyncStatus('⚠ Offline', '#909399');
+                }
+            });
+        });
+    }
+
+    // Завантаження обраного місяця: стан скидається, інтерфейс блокується,
+    // доки сервер не віддасть дані цього місяця.
+    function loadMonthData() {
+        calculateDaysInMonth();
+        monthLoaded = false;
+        prevMonthLoaded = false;
+        prevMonthBudget = [];
+        state = { checks: {}, mood: [], motivation: [], savedTimerMins: 25, budget: [] };
+        document.body.classList.add('is-loading');
+        const budgetBody = document.getElementById('budget-tbody');
+        if (budgetBody) budgetBody.innerHTML = '';
+        setSyncStatus('☁ Loading...', '#e6a23c');
+
+        waitForFirebase(() => {
+            if (firebaseUnsubscribe) { firebaseUnsubscribe(); firebaseUnsubscribe = null; }
+            if (prevMonthUnsubscribe) { prevMonthUnsubscribe(); prevMonthUnsubscribe = null; }
+
+            const y = currentYear, m = currentMonth;
+            const isCurrent = () => (y === currentYear && m === currentMonth);
+
+            firebaseUnsubscribe = window.dbOnValue(window.dbRef(window.db, monthPath()), (snapshot) => {
+                if (!isCurrent()) return;
+                const remote = snapshot.val() || {};
+                state = {
+                    checks: (remote.checks && typeof remote.checks === 'object') ? remote.checks : {},
+                    mood: remote.mood || [],
+                    motivation: remote.motivation || [],
+                    savedTimerMins: remote.savedTimerMins || 25,
+                    budget: toArrayLoose(remote.budget)
+                };
+                // старий формат (звички всередині місяця) — лише для міграції в пам'яті
+                if (Array.isArray(remote.habits)) state.habits = remote.habits;
+                monthLoaded = true;
+                refreshUI();
+            }, (error) => {
+                console.error('Month sync error:', error);
+                setSyncStatus('⚠ Offline', '#909399');
+            });
+
+            let pm = m - 1, py = y;
+            if (pm < 0) { pm = 11; py -= 1; }
+            prevMonthUnsubscribe = window.dbOnValue(window.dbRef(window.db, userPath(`${py}_${pm}/budget`)), (snapshot) => {
+                if (!isCurrent()) return;
+                prevMonthBudget = toArrayLoose(snapshot.val());
+                prevMonthLoaded = true;
+                if (monthLoaded) renderBudget();
+            }, () => { prevMonthLoaded = true; if (monthLoaded) renderBudget(); });
+        });
+    }
+
+    async function exportBackup() {
+        if (!window.dbGet || !window.db) { alert('Firebase ще не готовий. Спробуй за секунду.'); return; }
         try {
-            normalizeState();
-            const updates = {};
-            updates[`users/${encodeURIComponent(syncUserId)}/${currentYear}_${currentMonth}`] = state;
-            window.dbUpdate(window.dbRef(window.db), updates).catch(err => console.error('State push error:', err));
+            const snap = await window.dbGet(window.dbRef(window.db, userPath()));
+            const payload = { exportedAt: new Date().toISOString(), syncId: syncUserId, data: snap.val() || {} };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `habit-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         } catch (err) {
-            // Ніколи не даємо синхронній помилці Firebase SDK обірвати
-            // виконання функції, яка це викликала (втрата рендеру тощо).
-            console.error('State push error:', err);
+            console.error('Backup error:', err);
+            alert('Не вдалося зробити бекап: ' + err.message);
         }
     }
 
@@ -1982,8 +1977,9 @@
         if (input && input.value.trim()) {
             syncUserId = input.value.trim().replace(/[.#$\[\]/]/g, '');
             localStorage.setItem('habitTracker_syncId', syncUserId);
-            setupHabitsFirebaseSync();
-            setupFirebaseSync();
+            habitsLoaded = false;
+            subscribeHabits();
+            loadMonthData();
             closeSyncModal();
         }
     }
@@ -2054,7 +2050,7 @@
 
             const nameTd = document.createElement('td');
             nameTd.className = 'habit-title-col';
-            nameTd.innerHTML = `<span>${h.name}</span><span class="delete-btn" onclick="deleteHabit('${h.id}')">×</span>`;
+            nameTd.innerHTML = `<span>${escapeHtml(h.name)}</span><span class="edit-btn" title="Редагувати" onclick="editHabit('${h.id}')">${PENCIL_ICON}</span><span class="delete-btn" onclick="deleteHabit('${h.id}')">×</span>`;
             tr.appendChild(nameTd);
 
             if (!state.checks[h.id]) state.checks[h.id] = Array(daysTotal).fill(false);
@@ -2118,7 +2114,18 @@
                 toggleHabitCheck(h.id, targetDay, e.target.checked);
             });
 
-            card.appendChild(title);
+            const editBtn = document.createElement('span');
+            editBtn.className = 'edit-btn';
+            editBtn.title = 'Редагувати';
+            editBtn.innerHTML = PENCIL_ICON;
+            editBtn.addEventListener('click', () => editHabit(h.id));
+
+            const left = document.createElement('div');
+            left.style.cssText = 'display:flex; align-items:center; gap:2px; min-width:0;';
+            left.appendChild(title);
+            left.appendChild(editBtn);
+
+            card.appendChild(left);
             card.appendChild(checkbox);
             mobileContainer.appendChild(card);
         });
@@ -2132,30 +2139,27 @@
         mobileMood.onchange = (e) => {
             const val = clampMoodValue(e.target.value);
             e.target.value = val === null ? '' : val;
+            if (!isDataReady()) return;
             state.mood[targetDay] = val;
-            saveLocalData();
-            if (!isRemoteUpdate) updateRemoteField(`mood/${targetDay}`, val);
+            writeMonthField(`mood/${targetDay}`, val);
             updateMentalChart();
         };
 
         mobileMot.onchange = (e) => {
             const val = clampMoodValue(e.target.value);
             e.target.value = val === null ? '' : val;
+            if (!isDataReady()) return;
             state.motivation[targetDay] = val;
-            saveLocalData();
-            if (!isRemoteUpdate) updateRemoteField(`motivation/${targetDay}`, val);
+            writeMonthField(`motivation/${targetDay}`, val);
             updateMentalChart();
         };
     }
 
     function toggleHabitCheck(habitId, dayIdx, isChecked) {
+        if (!guardReady()) { renderTable(); renderMobileHabits(); return; }
         if (!state.checks[habitId]) state.checks[habitId] = Array(daysTotal).fill(false);
         state.checks[habitId][dayIdx] = isChecked;
-        saveLocalData();
-
-        if (!isRemoteUpdate) {
-            updateRemoteField(`checks/${habitId}/${dayIdx}`, isChecked);
-        }
+        writeMonthField(`checks/${habitId}/${dayIdx}`, isChecked);
 
         renderTable();
         renderMobileHabits();
@@ -2183,9 +2187,9 @@
             mInput.addEventListener('change', (e) => {
                 const val = clampMoodValue(e.target.value);
                 e.target.value = val === null ? '' : val;
+                if (!isDataReady()) return;
                 state.mood[d] = val;
-                saveLocalData();
-                if (!isRemoteUpdate) updateRemoteField(`mood/${d}`, val);
+                writeMonthField(`mood/${d}`, val);
                 updateMentalChart();
             });
             mTd.appendChild(mInput);
@@ -2199,9 +2203,9 @@
             motInput.addEventListener('change', (e) => {
                 const val = clampMoodValue(e.target.value);
                 e.target.value = val === null ? '' : val;
+                if (!isDataReady()) return;
                 state.motivation[d] = val;
-                saveLocalData();
-                if (!isRemoteUpdate) updateRemoteField(`motivation/${d}`, val);
+                writeMonthField(`motivation/${d}`, val);
                 updateMentalChart();
             });
             motTd.appendChild(motInput);
@@ -2239,8 +2243,7 @@
         if (mins && mins > 0) {
             state.savedTimerMins = mins;
             timerDuration = mins * 60;
-            saveLocalData();
-            if (!isRemoteUpdate) updateRemoteField(`savedTimerMins`, mins);
+            if (isDataReady()) writeMonthField('savedTimerMins', mins);
             resetTimer();
         }
     }
@@ -2431,12 +2434,13 @@
         sorted.forEach((item, index) => {
             const li = document.createElement('li');
             li.className = 'top-habit-item';
-            li.innerHTML = `<span>${index + 1}. ${item.name}</span><span style="font-weight: 700; color: #ffffff;">${item.pct}%</span>`;
+            li.innerHTML = `<span>${index + 1}. ${escapeHtml(item.name)}</span><span style="font-weight: 700; color: #ffffff;">${item.pct}%</span>`;
             list.appendChild(li);
         });
     }
 
     function addHabitPrompt() {
+        if (!guardReady()) return;
         const name = prompt("Enter new habit name:");
         if (name && name.trim()) {
             // Звичка починає діяти саме з цього місяця і далі — у минулі
@@ -2448,12 +2452,8 @@
                 removedAt: null
             });
             habitsList.push(newHabit);
-            saveGlobalHabits();
-            pushGlobalHabitsToFirebase();
-
+            writeHabits();
             state.checks[newHabit.id] = Array(daysTotal).fill(false);
-            saveLocalData();
-            pushFullStateToFirebase();
 
             renderTable();
             renderMobileHabits();
@@ -2461,7 +2461,33 @@
         }
     }
 
+    function editHabit(habitId) {
+        if (!guardReady()) return;
+        const habit = habitsList.find(h => h.id === habitId);
+        if (!habit) return;
+
+        const input = prompt('Edit habit name:', habit.name);
+        if (input === null) return; // Cancel
+
+        const newName = input.trim().replace(/\s+/g, ' ');
+        if (!newName) {
+            alert('Назва звички не може бути порожньою.');
+            return;
+        }
+        if (newName === habit.name) return;
+
+        // Змінюється лише назва: id, відмітки та період дії звички лишаються
+        // тими самими, тож уся історія відміток зберігається.
+        habit.name = newName;
+        writeHabits();
+
+        renderTable();
+        renderMobileHabits();
+        updateAll();
+    }
+
     function deleteHabit(habitId) {
+        if (!guardReady()) return;
         const habit = habitsList.find(h => h.id === habitId);
         if (!habit) return;
 
@@ -2470,8 +2496,7 @@
             // діє, починаючи з поточного місяця. Минулі місяці й дані
             // чеклистів лишаються недоторканими.
             habit.removedAt = monthKey(currentYear, currentMonth);
-            saveGlobalHabits();
-            pushGlobalHabitsToFirebase();
+            writeHabits();
 
             renderTable();
             renderMobileHabits();
@@ -2480,12 +2505,18 @@
     }
 
     function resetMonthData() {
+        if (!guardReady()) return;
         if (confirm("Reset all marks for this month?")) {
-            getVisibleHabits().forEach(h => { state.checks[h.id] = Array(daysTotal).fill(false); });
+            const updates = {};
+            getVisibleHabits().forEach(h => {
+                state.checks[h.id] = Array(daysTotal).fill(false);
+                updates[monthPath(`checks/${h.id}`)] = state.checks[h.id];
+            });
             state.mood = Array(daysTotal).fill(null);
             state.motivation = Array(daysTotal).fill(null);
-            saveLocalData();
-            pushFullStateToFirebase();
+            updates[monthPath('mood')] = null;
+            updates[monthPath('motivation')] = null;
+            writeRemote(updates);
             renderTable();
             renderMobileHabits();
             updateAll();
@@ -2503,10 +2534,10 @@
     }
 
     function resetBudgetData() {
+        if (!guardReady()) return;
         if (confirm("Видалити всі транзакції цього місяця? Залишок і накопичення з попередніх місяців не постраждають.")) {
             state.budget = [];
-            saveLocalData();
-            pushFullStateToFirebase();
+            writeBudget();
             renderBudget();
         }
     }
