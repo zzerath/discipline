@@ -17,6 +17,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             databaseURL: "https://my-habit-tracker-1eaf1-default-rtdb.europe-west1.firebasedatabase.app/"
@@ -30,6 +31,11 @@
         window.dbOnValue = onValue;
         window.dbUpdate = update;
         window.dbGet = get;
+
+        const auth = getAuth(app);
+        window.authOnChange = (callback) => onAuthStateChanged(auth, callback);
+        window.authSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+        window.authSignOut = () => signOut(auth);
     </script>
 
     <style>
@@ -1013,14 +1019,22 @@
 </div>
 
 <!-- Modal Sync Dialog -->
+<div id="login-overlay" style="display: none; position: fixed; inset: 0; z-index: 3000; background: #0a0a0a; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+    <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 10px;">
+        <h3 style="font-size: 16px; text-align: center; margin: 0 0 6px;">Вхід</h3>
+        <input type="email" id="login-email" placeholder="Email" autocomplete="username" style="width: 100%; box-sizing: border-box;">
+        <input type="password" id="login-password" placeholder="Пароль" autocomplete="current-password" style="width: 100%; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') handleLogin()">
+        <button class="btn btn-primary" style="width: 100%;" onclick="handleLogin()">Увійти</button>
+        <div id="login-error" style="color: #f56c6c; font-size: 12px; min-height: 16px; text-align: center;"></div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="sync-modal">
     <div class="modal-box">
-        <h3 style="font-size: 16px;">Device Synchronization</h3>
-        <p style="font-size: 12px; color: #888;">Scan QR code with your phone to open & sync instantly:</p>
-        <div id="qrcode-container"></div>
-        <input type="text" id="sync-id-input" style="width: 100%; text-align: center;" placeholder="Sync ID">
+        <h3 style="font-size: 16px;">Акаунт</h3>
+        <p style="font-size: 12px; color: #888;">Увійдено як: <span id="account-email"></span></p>
         <div style="display: flex; gap: 8px; width: 100%;">
-            <button class="btn btn-primary" style="flex: 1;" onclick="applySyncId()">Save & Connect</button>
+            <button class="btn" style="flex: 1;" onclick="handleLogout()">Вийти</button>
             <button class="btn" style="flex: 1;" onclick="closeSyncModal()">Close</button>
         </div>
         <button class="btn" style="width: 100%;" onclick="exportBackup()">Download backup (JSON)</button>
@@ -1111,11 +1125,100 @@
     let timerInterval = null;
     let isTimerRunning = false;
 
-    window.addEventListener('DOMContentLoaded', () => {
-        setupDateControls();
+    // Дані читаються тільки з акаунта користувача. Без входу застосунок не запускається.
+    const LEGACY_SYNC_ID = 'user-8htle7'; // старий sync ID, під яким дані лежали до входу
+    let appStarted = false;
+
+    function showLoginScreen() {
+        document.getElementById('login-overlay').style.display = 'flex';
+    }
+
+    function hideLoginScreen() {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-error').innerText = '';
+    }
+
+    function loginErrorText(code) {
+        if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-email') return 'Невірна пошта або пароль.';
+        if (code === 'auth/too-many-requests') return 'Забагато спроб. Спробуй пізніше.';
+        if (code === 'auth/network-request-failed') return 'Немає інтернету.';
+        return 'Не вдалося увійти.';
+    }
+
+    async function handleLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        if (!email || !password) {
+            document.getElementById('login-error').innerText = 'Введіть пошту і пароль.';
+            return;
+        }
+        document.getElementById('login-error').innerText = '';
+        try {
+            await window.authSignIn(email, password);
+        } catch (err) {
+            document.getElementById('login-error').innerText = loginErrorText(err.code);
+        }
+    }
+
+    async function handleLogout() {
+        if (!confirm('Вийти з акаунта?')) return;
+        await window.authSignOut();
+        location.reload();
+    }
+
+    // Одноразовий перенос: якщо в акаунті даних ще немає, копіюємо дані зі старого
+    // sync ID. Старий вузол не видаляється. Якщо перенос не вдався, застосунок
+    // не запускається, щоб порожній акаунт не закріпився і не заблокував перенос.
+    async function migrateLegacyDataIfNeeded(uid) {
+        const ownSnap = await window.dbGet(window.dbRef(window.db, `users/${uid}`));
+        if (ownSnap.val()) return;
+
+        const legacySnap = await window.dbGet(window.dbRef(window.db, `users/${LEGACY_SYNC_ID}`));
+        const legacyData = legacySnap.val();
+        if (!legacyData) return;
+
+        await window.dbUpdate(window.dbRef(window.db), { [`users/${uid}`]: legacyData });
+    }
+
+    function startAppForUser(user) {
+        syncUserId = user.uid;
+        if (appStarted) return;
+        appStarted = true;
         subscribeConnectionStatus();
         subscribeHabits();
         loadMonthData();
+    }
+
+    function waitForAuthModule(callback) {
+        const timer = setInterval(() => {
+            if (window.authOnChange) {
+                clearInterval(timer);
+                callback();
+            }
+        }, 100);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setupDateControls();
+        waitForAuthModule(() => {
+            window.authOnChange(async (user) => {
+                if (!user) {
+                    showLoginScreen();
+                    return;
+                }
+                hideLoginScreen();
+                window.currentUserEmail = user.email || '';
+                try {
+                    await migrateLegacyDataIfNeeded(user.uid);
+                } catch (err) {
+                    console.error('Migration error:', err);
+                    alert('Не вдалося перенести дані зі старого акаунта. Застосунок не запущено, спробуй оновити сторінку.');
+                    return;
+                }
+                startAppForUser(user);
+            });
+        });
     });
 
     window.addEventListener('beforeunload', (e) => {
@@ -2100,49 +2203,12 @@
     }
 
     function openSyncModal() {
-        const modal = document.getElementById('sync-modal');
-        const input = document.getElementById('sync-id-input');
-        const qrBox = document.getElementById('qrcode-container');
-
-        input.value = syncUserId;
-        qrBox.innerHTML = '';
-
-        const cleanUrl = window.location.href.split('?')[0];
-        const fullSyncUrl = `${cleanUrl}?syncId=${encodeURIComponent(syncUserId)}`;
-
-        if (typeof QRCode === 'function') {
-            try {
-                new QRCode(qrBox, { text: fullSyncUrl, width: 140, height: 140 });
-            } catch (e) {
-                qrBox.innerHTML = buildSyncLinkFallback(fullSyncUrl);
-            }
-        } else {
-            qrBox.innerHTML = buildSyncLinkFallback(fullSyncUrl);
-        }
-
-        modal.style.display = 'flex';
-    }
-
-    function buildSyncLinkFallback(url) {
-        return `<div style="width:140px; padding:6px; font-size:11px; color:#333; text-align:center;">
-            QR-код недоступний (немає інтернету?). Скопіюйте посилання вручну:<br>
-            <a href="${url}" style="color:#000; word-break:break-all;">${url}</a>
-        </div>`;
+        document.getElementById('account-email').innerText = (window.currentUserEmail || '');
+        document.getElementById('sync-modal').style.display = 'flex';
     }
 
     function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
 
-    function applySyncId() {
-        const input = document.getElementById('sync-id-input');
-        if (input && input.value.trim()) {
-            syncUserId = input.value.trim().replace(/[.#$\[\]/]/g, '');
-            localStorage.setItem('habitTracker_syncId', syncUserId);
-            habitsLoaded = false;
-            subscribeHabits();
-            loadMonthData();
-            closeSyncModal();
-        }
-    }
 
     function getTodayIndex() {
         const now = new Date();
