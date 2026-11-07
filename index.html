@@ -554,6 +554,15 @@
 
         .stat-val { font-size: 1.1rem; font-weight: 700; }
 
+        .single-stat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+            min-height: 70px;
+        }
+        .single-stat .stat-val { font-size: 1.6rem; }
+
         svg.donut {
             width: 70px;
             height: 70px;
@@ -926,15 +935,9 @@
         <div class="top-widgets">
             <div class="card">
                 <div class="widget-title">Total budget</div>
-                <div class="donut-container">
-                    <div class="donut-stats">
-                        <span class="stat-label">Remainder</span>
-                        <span class="stat-val" id="b-total-balance">0 ₴</span>
-                    </div>
-                    <svg class="donut" viewBox="0 0 36 36">
-                        <circle class="bg" cx="18" cy="18" r="15.9155" />
-                        <circle class="meter" id="donut-balance" cx="18" cy="18" r="15.9155" stroke="var(--accent-blue)" stroke-dasharray="0, 100" />
-                    </svg>
+                <div class="single-stat">
+                    <span class="stat-label">Remainder</span>
+                    <span class="stat-val" id="b-total-balance">0 ₴</span>
                 </div>
             </div>
 
@@ -2027,11 +2030,9 @@
         document.getElementById('b-summary-expense').innerText = `-${(totalExpense + totalSaved).toLocaleString()} ₴`;
 
         const incomePct = totalIncome > 0 ? 100 : 0;
-        const balancePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalBalance / totalIncome) * 100))) : 0;
         const expensePct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalExpense / totalIncome) * 100))) : 0;
         const savedPct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalSaved / totalIncome) * 100))) : 0;
         
-        document.getElementById('donut-balance').setAttribute('stroke-dasharray', `${balancePct}, 100`);
         drawIncomeRing(totalIncome, carryOverBalance);
         drawExpenseRing(totalIncome);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
