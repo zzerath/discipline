@@ -1823,6 +1823,119 @@
         closeBudgetFilterMenu();
     });
 
+    // ===== Сегменти кіл бюджету =====
+    // Доходи групуються за описом, витрати за категорією. Колір стабільний:
+    // однакова назва завжди дає однаковий відтінок, навіть у іншому місяці.
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function hashString(str) {
+        let h = 0;
+        for (const ch of str) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        return h;
+    }
+
+    function incomeSegmentColor(key) {
+        const h = hashString(key);
+        return `hsl(${135 + (h % 30)}, 65%, ${40 + ((h >> 4) % 5) * 6}%)`;
+    }
+
+    function expenseSegmentColor(key) {
+        const h = hashString(key);
+        return `hsl(${(h % 40)}, 70%, ${42 + ((h >> 4) % 5) * 6}%)`;
+    }
+
+    function groupBudgetBy(items, keyFn, labelFn) {
+        const map = new Map();
+        items.forEach(item => {
+            const key = keyFn(item);
+            if (!key) return;
+            if (!map.has(key)) map.set(key, { key, label: labelFn(item), amount: 0 });
+            map.get(key).amount += item.amount;
+        });
+        return [...map.values()];
+    }
+
+    // Малює сегменти поверх фонового кола. Кожен сегмент — дуга з tooltip
+    // при наведенні та коротка світла полоска на його кінці.
+    function drawDonutSegments(meterCircle, segments, colorFn) {
+        const svg = meterCircle.parentNode;
+        meterCircle.setAttribute('stroke-dasharray', '0, 100');
+        svg.querySelectorAll('.seg-group').forEach(g => g.remove());
+
+        const group = document.createElementNS(SVG_NS, 'g');
+        group.setAttribute('class', 'seg-group');
+
+        let start = 0;
+        segments.forEach(seg => {
+            if (seg.pct <= 0) return;
+            const arc = document.createElementNS(SVG_NS, 'circle');
+            arc.setAttribute('class', 'seg');
+            arc.setAttribute('cx', '18');
+            arc.setAttribute('cy', '18');
+            arc.setAttribute('r', '15.9155');
+            arc.setAttribute('fill', 'none');
+            arc.setAttribute('stroke', colorFn(seg.key));
+            arc.setAttribute('stroke-width', '4');
+            arc.setAttribute('stroke-linecap', 'butt');
+            arc.setAttribute('stroke-dasharray', `${seg.pct} ${100 - seg.pct}`);
+            arc.setAttribute('stroke-dashoffset', `${-start}`);
+
+            const title = document.createElementNS(SVG_NS, 'title');
+            title.textContent = `${seg.label}: ${seg.amount.toLocaleString()} ₴ (${seg.share}%)`;
+            arc.appendChild(title);
+            group.appendChild(arc);
+
+            // Полоска на кінці сегмента
+            const mark = document.createElementNS(SVG_NS, 'circle');
+            mark.setAttribute('class', 'seg-mark');
+            mark.setAttribute('cx', '18');
+            mark.setAttribute('cy', '18');
+            mark.setAttribute('r', '15.9155');
+            mark.setAttribute('fill', 'none');
+            mark.setAttribute('stroke', '#ffffff');
+            mark.setAttribute('stroke-width', '5');
+            mark.setAttribute('stroke-linecap', 'butt');
+            mark.setAttribute('stroke-dasharray', '0.8 100');
+            mark.setAttribute('stroke-dashoffset', `${-(start + seg.pct) + 0.4}`);
+            mark.style.pointerEvents = 'none';
+            group.appendChild(mark);
+
+            start += seg.pct;
+        });
+
+        svg.appendChild(group);
+    }
+
+    function drawIncomeRing(totalIncome, carryOverBalance) {
+        const incomeItems = state.budget.filter(t => t.type === 'income');
+        const groups = groupBudgetBy(incomeItems, t => t.desc.trim().toLowerCase(), t => t.desc.trim());
+        if (carryOverBalance > 0) {
+            groups.unshift({ key: 'carry', label: 'Залишок з минулого місяця', amount: carryOverBalance });
+        }
+        const segments = groups.map(g => ({
+            key: g.key,
+            label: g.label,
+            amount: g.amount,
+            share: totalIncome > 0 ? Math.round((g.amount / totalIncome) * 100) : 0,
+            pct: totalIncome > 0 ? (g.amount / totalIncome) * 100 : 0
+        }));
+        drawDonutSegments(document.getElementById('donut-income'), segments,
+            key => key === 'carry' ? 'hsl(140, 30%, 55%)' : incomeSegmentColor(key));
+    }
+
+    function drawExpenseRing(totalIncome) {
+        const expenseItems = state.budget.filter(t => t.type === 'expense');
+        const groups = groupBudgetBy(expenseItems, t => t.cat || 'Other', t => t.cat || 'Other');
+        const segments = groups.map(g => ({
+            key: g.key,
+            label: g.label,
+            amount: g.amount,
+            share: totalIncome > 0 ? Math.round((g.amount / totalIncome) * 100) : 0,
+            pct: totalIncome > 0 ? Math.min(100, (g.amount / totalIncome) * 100) : 0
+        }));
+        drawDonutSegments(document.getElementById('donut-expense'), segments, expenseSegmentColor);
+    }
+
     function renderBudget() {
         if (!monthLoaded || !prevMonthLoaded) return;
         const tbody = document.getElementById('budget-tbody');
@@ -1919,8 +2032,8 @@
         const savedPct = totalIncome > 0 ? Math.max(0, Math.min(100, Math.round((totalSaved / totalIncome) * 100))) : 0;
         
         document.getElementById('donut-balance').setAttribute('stroke-dasharray', `${balancePct}, 100`);
-        document.getElementById('donut-income').setAttribute('stroke-dasharray', `${incomePct}, 100`);
-        document.getElementById('donut-expense').setAttribute('stroke-dasharray', `${expensePct}, 100`);
+        drawIncomeRing(totalIncome, carryOverBalance);
+        drawExpenseRing(totalIncome);
         document.getElementById('donut-saved').setAttribute('stroke-dasharray', `${savedPct}, 100`);
 
         renderCategoryAnalytics();
