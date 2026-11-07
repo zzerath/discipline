@@ -608,6 +608,56 @@
             font-size: 0.75rem;
         }
 
+        .filter-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px;
+            padding: 3px;
+            border-radius: 3px;
+            color: #666;
+            cursor: pointer;
+            vertical-align: middle;
+            text-transform: none;
+        }
+        .filter-btn:hover { color: #fff; }
+        .filter-btn.active { color: #fff; background: #3a3a3a; }
+
+        .budget-filter-mobile-bar { display: none; }
+
+        #budget-filter-menu {
+            position: fixed;
+            z-index: 2500;
+            display: none;
+            min-width: 190px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 8px;
+            background: #1c1c1c;
+            border: 1px solid #444;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: none;
+        }
+        .fm-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 4px;
+            cursor: pointer;
+            color: #eee;
+        }
+        .fm-row:hover { background: #2a2a2a; }
+        .fm-actions { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #333; }
+        .fm-actions .btn { flex: 1; }
+
+        @media (max-width: 900px) {
+            .filter-btn-desktop { display: none; }
+            .budget-filter-mobile-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+        }
+
         .budget-table td {
             padding: 12px;
             border-bottom: 1px solid var(--card-border);
@@ -936,13 +986,19 @@
                 <div class="widget-title" style="margin: 0;">Transaction Register</div>
                 <span id="b-records-count" style="font-size: 0.75rem; color: var(--text-secondary);">Total entries: 0</span>
             </div>
+            <div class="budget-filter-mobile-bar">
+                <button class="btn budget-filter-mobile" onclick="toggleBudgetFilterMenu('cat', this, event)">Категорія ▾</button>
+                <button class="btn budget-filter-mobile" onclick="toggleBudgetFilterMenu('type', this, event)">Тип ▾</button>
+                <span id="budget-filter-info" style="font-size: 11px; color: #888;"></span>
+            </div>
+            <div id="budget-filter-menu"></div>
             <table class="budget-table">
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Description / Source</th>
-                        <th>Category</th>
-                        <th>Type</th>
+                        <th>Category<span class="filter-btn filter-btn-desktop" data-filter="cat" title="Фільтр" onclick="toggleBudgetFilterMenu('cat', this, event)"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></span></th>
+                        <th>Type<span class="filter-btn filter-btn-desktop" data-filter="type" title="Фільтр" onclick="toggleBudgetFilterMenu('type', this, event)"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></span></th>
                         <th style="text-align: right;">Sum</th>
                     </tr>
                 </thead>
@@ -1672,6 +1728,101 @@
     }
 
     /* --- Budget Functionality --- */
+    // Фільтр впливає лише на видимий список транзакцій. Підсумки за місяць
+    // завжди рахуються по всіх записах. null — фільтр не активний,
+    // масив — дозволені значення (порожній масив — нічого не показувати).
+    let budgetFilter = { cat: null, type: null };
+    let openFilterField = null;
+    const TYPE_LABELS = { income: 'Income', expense: 'Expense', saved: 'Saved' };
+
+    function getFilterValues(field) {
+        if (field === 'type') {
+            return Object.keys(TYPE_LABELS).map(v => ({ value: v, label: TYPE_LABELS[v] }));
+        }
+        return [...new Set(state.budget.map(t => t.cat || 'Other'))].sort().map(v => ({ value: v, label: v }));
+    }
+
+    function getItemFilterValue(item, field) {
+        return field === 'type' ? item.type : (item.cat || 'Other');
+    }
+
+    function toggleBudgetFilterMenu(field, anchor, event) {
+        event.stopPropagation();
+        if (openFilterField === field) { closeBudgetFilterMenu(); return; }
+        openFilterField = field;
+
+        const menu = document.getElementById('budget-filter-menu');
+        const values = getFilterValues(field);
+        const selected = budgetFilter[field] === null ? values.map(v => v.value) : budgetFilter[field];
+
+        menu.innerHTML = `
+            <label class="fm-row"><input type="checkbox" class="fm-all-box" ${selected.length === values.length ? 'checked' : ''}> <b>Вибрати все</b></label>
+            ${values.map(v => `<label class="fm-row"><input type="checkbox" class="fm-box" value="${escapeHtml(v.value)}" ${selected.includes(v.value) ? 'checked' : ''}> ${escapeHtml(v.label)}</label>`).join('')}
+            <div class="fm-actions"><button class="btn" data-clear="1">Очистити</button><button class="btn btn-primary" data-done="1">Готово</button></div>`;
+        menu.dataset.field = field;
+
+        menu.style.display = 'block';
+        const rect = anchor.getBoundingClientRect();
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8));
+        menu.style.left = left + 'px';
+        menu.style.top = (rect.bottom + 6) + 'px';
+    }
+
+    function closeBudgetFilterMenu() {
+        openFilterField = null;
+        const menu = document.getElementById('budget-filter-menu');
+        menu.style.display = 'none';
+        menu.innerHTML = '';
+    }
+
+    function applyBudgetFilterFromMenu() {
+        const menu = document.getElementById('budget-filter-menu');
+        const field = menu.dataset.field;
+        const values = getFilterValues(field).map(v => v.value);
+        const checked = [...menu.querySelectorAll('.fm-box:checked')].map(b => b.value);
+        budgetFilter[field] = checked.length === values.length ? null : checked;
+        renderBudget();
+    }
+
+    function updateBudgetFilterButtons() {
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+            btn.classList.toggle('active', budgetFilter[btn.dataset.filter] !== null);
+        });
+    }
+
+    function matchesBudgetFilter(item) {
+        if (budgetFilter.cat !== null && !budgetFilter.cat.includes(getItemFilterValue(item, 'cat'))) return false;
+        if (budgetFilter.type !== null && !budgetFilter.type.includes(getItemFilterValue(item, 'type'))) return false;
+        return true;
+    }
+
+    const budgetFilterMenu = document.getElementById('budget-filter-menu');
+    budgetFilterMenu.addEventListener('change', (e) => {
+        if (e.target.classList.contains('fm-all-box')) {
+            budgetFilterMenu.querySelectorAll('.fm-box').forEach(b => b.checked = e.target.checked);
+        } else {
+            const all = [...budgetFilterMenu.querySelectorAll('.fm-box')];
+            budgetFilterMenu.querySelector('.fm-all-box').checked = all.every(b => b.checked);
+        }
+        applyBudgetFilterFromMenu();
+    });
+
+    budgetFilterMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (e.target.dataset.clear) {
+            budgetFilterMenu.querySelectorAll('.fm-box, .fm-all-box').forEach(b => b.checked = false);
+            applyBudgetFilterFromMenu();
+        } else if (e.target.dataset.done) {
+            closeBudgetFilterMenu();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (openFilterField === null) return;
+        if (e.target.closest('#budget-filter-menu') || e.target.closest('.filter-btn') || e.target.closest('.budget-filter-mobile')) return;
+        closeBudgetFilterMenu();
+    });
+
     function renderBudget() {
         if (!monthLoaded || !prevMonthLoaded) return;
         const tbody = document.getElementById('budget-tbody');
@@ -1701,8 +1852,17 @@
             tbody.appendChild(tr);
         }
 
+        updateBudgetFilterButtons();
+        let shownCount = 0;
+
         state.budget.forEach((item, index) => {
+            // Підсумки рахуємо по всіх записах, а показуємо лише відфільтровані.
+            // index — оригінальний індекс, тож редагування й видалення працюють правильно.
+            const visible = matchesBudgetFilter(item);
+            if (visible) shownCount++;
+
             const tr = document.createElement('tr');
+            if (!visible) tr.style.display = 'none';
 
             let tagClass = 'tag-income';
             let tagText = 'Income';
@@ -1737,6 +1897,10 @@
             `;
             tbody.appendChild(tr);
         });
+
+        const filterInfo = document.getElementById('budget-filter-info');
+        const isFiltered = budgetFilter.cat !== null || budgetFilter.type !== null;
+        filterInfo.innerText = isFiltered ? `Показано ${shownCount} із ${state.budget.length}` : '';
 
         const totalBalance = totalIncome - totalExpense - (totalSaved - carryOverSaved);
 
