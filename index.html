@@ -1024,12 +1024,14 @@
             <button class="btn" style="flex: 1;" onclick="closeSyncModal()">Close</button>
         </div>
         <button class="btn" style="width: 100%;" onclick="exportBackup()">Download backup (JSON)</button>
+        <button class="btn" style="width: 100%;" onclick="document.getElementById('restore-file-input').click()">Restore from backup…</button>
+        <input type="file" id="restore-file-input" accept="application/json,.json" style="display: none;" onchange="handleRestoreFile(this)">
     </div>
 </div>
 
 <div class="modal-overlay" id="transaction-modal">
     <div class="modal-box">
-        <h3 style="font-size: 16px;">Add Transaction</h3>
+        <h3 id="tx-modal-title" style="font-size: 16px;">Add Transaction</h3>
 
         <input type="text" id="tx-desc-input" style="width: 100%; box-sizing: border-box;" placeholder="Description / source" maxlength="60">
         <input type="text" id="tx-cat-input" style="width: 100%; box-sizing: border-box;" placeholder="Category (e.g. Work, Food, Leisure)" maxlength="30">
@@ -1043,7 +1045,7 @@
         <input type="number" id="tx-amount-input" style="width: 100%; box-sizing: border-box;" placeholder="Amount (₴)" min="0" step="0.01" onkeydown="if(event.key === 'Enter') submitTransaction()">
 
         <div style="display: flex; gap: 8px; width: 100%;">
-            <button class="btn btn-primary" style="flex: 1;" onclick="submitTransaction()">Add</button>
+            <button id="tx-submit-btn" class="btn btn-primary" style="flex: 1;" onclick="submitTransaction()">Add</button>
             <button class="btn" style="flex: 1;" onclick="closeTransactionModal()">Cancel</button>
         </div>
     </div>
@@ -1621,7 +1623,7 @@
                 <td data-label="Type"><span class="tag ${tagClass}">${tagText}</span></td>
                 <td data-label="Sum" style="font-weight: 700; color: ${amountColor}; text-align: right;">
                     ${amountPrefix}${item.amount.toLocaleString()} ₴
-                    <span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
+                    <span class="edit-btn" title="Редагувати" onclick="editTransaction(${index})">${PENCIL_ICON}</span><span class="delete-btn" onclick="deleteTransaction(${index})">×</span>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1736,8 +1738,18 @@
 
     let selectedTxType = 'income';
 
+    // null — режим додавання; інакше { index, original } — редагуємо існуючу транзакцію
+    let editingTx = null;
+
+    function setTransactionModalMode(editing) {
+        document.getElementById('tx-modal-title').innerText = editing ? 'Edit Transaction' : 'Add Transaction';
+        document.getElementById('tx-submit-btn').innerText = editing ? 'Save' : 'Add';
+    }
+
     function openTransactionModal() {
         if (!guardReady()) return;
+        editingTx = null;
+        setTransactionModalMode(false);
         document.getElementById('tx-desc-input').value = '';
         document.getElementById('tx-cat-input').value = '';
         document.getElementById('tx-amount-input').value = '';
@@ -1746,8 +1758,26 @@
         document.getElementById('tx-desc-input').focus();
     }
 
+    function editTransaction(index) {
+        if (!guardReady()) return;
+        const item = state.budget[index];
+        if (!item) return;
+
+        // Зберігаємо копію оригіналу, щоб перед збереженням переконатись,
+        // що запис за цим індексом не змінився (наприклад, з іншого пристрою).
+        editingTx = { index, original: JSON.stringify(item) };
+        setTransactionModalMode(true);
+        document.getElementById('tx-desc-input').value = item.desc || '';
+        document.getElementById('tx-cat-input').value = item.cat || '';
+        document.getElementById('tx-amount-input').value = String(item.amount);
+        selectTransactionType(item.type);
+        document.getElementById('transaction-modal').style.display = 'flex';
+        document.getElementById('tx-desc-input').focus();
+    }
+
     function closeTransactionModal() {
         document.getElementById('transaction-modal').style.display = 'none';
+        editingTx = null;
     }
 
     function selectTransactionType(type) {
@@ -1776,10 +1806,22 @@
             return;
         }
 
-        const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
-
         if (!guardReady()) return;
-        state.budget.unshift({ date: dateNow, desc, cat: (cat || 'Other'), type: selectedTxType, amount });
+
+        if (editingTx) {
+            const current = state.budget[editingTx.index];
+            if (!current || JSON.stringify(current) !== editingTx.original) {
+                alert('Ця транзакція тим часом змінилась (можливо, на іншому пристрої). Закрий вікно і відкрий її ще раз.');
+                closeTransactionModal();
+                renderBudget();
+                return;
+            }
+            // Дата лишається оригінальною — редагуються опис, категорія, тип і сума.
+            state.budget[editingTx.index] = { ...current, desc, cat: (cat || 'Other'), type: selectedTxType, amount };
+        } else {
+            const dateNow = new Date().getDate() + " " + monthNames[currentMonth].substring(0, 3);
+            state.budget.unshift({ date: dateNow, desc, cat: (cat || 'Other'), type: selectedTxType, amount });
+        }
         writeBudget();
         renderBudget();
         closeTransactionModal();
@@ -1917,6 +1959,124 @@
                 if (monthLoaded) renderBudget();
             }, () => { prevMonthLoaded = true; if (monthLoaded) renderBudget(); });
         });
+    }
+
+    // ===== Відновлення з бекапу =====
+    // Бекап повністю замінює дані користувача, тому файл спершу сувора
+    // перевіряється, а поточні дані перед заміною копіюються в базу.
+    function countHabits(data) {
+        const list = data && data.habits && data.habits.list;
+        return list ? Object.values(list).length : 0;
+    }
+    function monthKeysOf(data) {
+        return Object.keys(data || {}).filter(k => /^\d{4}_\d{1,2}$/.test(k));
+    }
+    function countTransactions(data) {
+        return monthKeysOf(data).reduce((sum, k) => sum + (data[k].budget ? Object.values(data[k].budget).length : 0), 0);
+    }
+    function describeData(data) {
+        const months = monthKeysOf(data).length;
+        return `${countHabits(data)} звичок, ${months} міс., ${countTransactions(data)} транзакцій`;
+    }
+
+    function validateBackupData(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Дані бекапу мають неправильну структуру.';
+        if (!data.habits || typeof data.habits !== 'object') return 'У бекапі немає списку звичок — це не повний бекап.';
+
+        for (const key of Object.keys(data)) {
+            if (key !== 'habits' && !/^\d{4}_(\d|1[01])$/.test(key)) return `Невідомий розділ у бекапі: "${key}".`;
+        }
+
+        const habitList = data.habits.list ? Object.values(data.habits.list) : [];
+        const idRe = /^[A-Za-z0-9_-]{1,40}$/;
+        for (const h of habitList) {
+            if (!h || typeof h.id !== 'string' || !idRe.test(h.id) || typeof h.name !== 'string') return 'Список звичок у бекапі пошкоджений.';
+            if (h.addedAt !== undefined && !Number.isFinite(h.addedAt)) return 'Список звичок у бекапі пошкоджений.';
+            if (h.removedAt !== undefined && h.removedAt !== null && !Number.isFinite(h.removedAt)) return 'Список звичок у бекапі пошкоджений.';
+        }
+
+        const allowedMonthKeys = ['checks', 'mood', 'motivation', 'savedTimerMins', 'budget', 'habits'];
+        for (const mk of monthKeysOf(data)) {
+            const m = data[mk];
+            if (!m || typeof m !== 'object' || Array.isArray(m)) return `Дані місяця ${mk} пошкоджені.`;
+            for (const k of Object.keys(m)) {
+                if (!allowedMonthKeys.includes(k)) return `Невідомі дані в місяці ${mk}: "${k}".`;
+            }
+            if (m.checks) {
+                if (typeof m.checks !== 'object') return `Відмітки місяця ${mk} пошкоджені.`;
+                for (const [hid, arr] of Object.entries(m.checks)) {
+                    if (!idRe.test(hid) || !arr || typeof arr !== 'object') return `Відмітки місяця ${mk} пошкоджені.`;
+                    if (!Object.values(arr).every(v => typeof v === 'boolean')) return `Відмітки місяця ${mk} пошкоджені.`;
+                }
+            }
+            for (const field of ['mood', 'motivation']) {
+                if (m[field] && !Object.values(m[field]).every(v => v === null || (Number.isFinite(v) && v >= 1 && v <= 10))) return `Дані "${field}" місяця ${mk} пошкоджені.`;
+            }
+            if (m.savedTimerMins !== undefined && !Number.isFinite(m.savedTimerMins)) return `Налаштування таймера місяця ${mk} пошкоджені.`;
+            if (m.budget) {
+                for (const t of Object.values(m.budget)) {
+                    if (!t || !Number.isFinite(t.amount) || !['income', 'expense', 'saved'].includes(t.type)) return `Транзакції місяця ${mk} пошкоджені.`;
+                    if ((t.desc !== undefined && typeof t.desc !== 'string') || (t.cat !== undefined && typeof t.cat !== 'string')) return `Транзакції місяця ${mk} пошкоджені.`;
+                }
+            }
+        }
+        return null;
+    }
+
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(new Error('Не вдалося прочитати файл.'));
+            reader.readAsText(file);
+        });
+    }
+
+    async function handleRestoreFile(input) {
+        const file = input.files && input.files[0];
+        input.value = ''; // щоб той самий файл можна було вибрати повторно
+        if (!file) return;
+
+        try {
+            if (!window.dbGet || !window.db) throw new Error('Firebase ще не готовий. Спробуй за секунду.');
+            if (file.size > 5 * 1024 * 1024) throw new Error('Файл завеликий для бекапу (понад 5 МБ).');
+
+            let payload;
+            try { payload = JSON.parse(await readFileAsText(file)); }
+            catch (e) { throw new Error('Це не коректний JSON-файл.'); }
+
+            if (!payload || typeof payload !== 'object' || !payload.data) throw new Error('Це не бекап цього застосунку.');
+            const problem = validateBackupData(payload.data);
+            if (problem) throw new Error(problem);
+
+            const currentSnap = await window.dbGet(window.dbRef(window.db, userPath()));
+            const current = currentSnap.val() || {};
+
+            let msg = `Відновити дані з файлу "${file.name}"?\n\n`
+                + `У файлі: ${describeData(payload.data)}\n`
+                + `Зараз у базі: ${describeData(current)}\n\n`
+                + `ПОТОЧНІ ДАНІ БУДЕ ЗАМІНЕНО. Перед цим їх копію буде збережено в базі.`;
+            if (payload.syncId && payload.syncId !== syncUserId) {
+                msg += `\n\n⚠ Бекап зроблено для іншого sync ID (${payload.syncId}), а зараз ви підключені як ${syncUserId}.`;
+            }
+            if (!confirm(msg)) return;
+
+            // 1. Копія поточних даних. Якщо вона не збереглась — нічого не замінюємо.
+            let snapshotKey = null;
+            if (Object.keys(current).length) {
+                snapshotKey = new Date().toISOString().replace(/[:.]/g, '-');
+                await window.dbUpdate(window.dbRef(window.db), { [`backups/${encodeURIComponent(syncUserId)}/${snapshotKey}`]: current });
+            }
+
+            // 2. Заміна даних користувача.
+            await window.dbUpdate(window.dbRef(window.db), { [userPath()]: payload.data });
+
+            alert('Відновлено.' + (snapshotKey ? `\nКопія попередніх даних: backups/${syncUserId}/${snapshotKey}` : ''));
+            closeSyncModal();
+        } catch (err) {
+            console.error('Restore error:', err);
+            alert('Не вдалося відновити: ' + err.message);
+        }
     }
 
     async function exportBackup() {
